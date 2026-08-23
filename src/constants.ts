@@ -232,6 +232,56 @@ export const SETTINGS = {
    */
   companionCommands: "companionCommands",
   /**
+   * Master switch for automating **Close-Knit** (Hearthborne, *Void for
+   * Daggerheart*): put a "share Hope" action on a card the Void ships as prose,
+   * so a character can spend any number of Hope to hand an ally the same number,
+   * once per long rest. See `daggerheart/close-knit.ts`.
+   *
+   * World-scoped and **on** by default, for the same reasons as
+   * {@link SETTINGS.companionCommands}, whose card this one resembles: both *add*
+   * an action to a passive card rather than replacing anything, and both build it
+   * during data preparation on every client, so a per-user preference would put a
+   * button on one screen and not another. Switching it off returns the card to
+   * being description-only, and leaves any "spent" marker already on a sheet to
+   * expire on its own at the next long rest.
+   */
+  closeKnitShareHope: "closeKnitShareHope",
+  /**
+   * Master switch for automating **Not Good Enough** (Blade domain): after a
+   * character holding the card rolls damage, offer to reroll every damage die
+   * that came up 1 or 2 — before the result reaches the chat card, so the table
+   * reads one damage figure rather than watching it get corrected. See
+   * `daggerheart/not-good-enough.ts`.
+   *
+   * World-scoped and **on** by default, like the rest of the feature switches.
+   * The *player's* half of this feature is a separate, client-scoped preference —
+   * see {@link SETTINGS.notGoodEnoughAlwaysReroll} — and this switch outranks it:
+   * with this off nothing is rerolled and nothing is asked, whatever any
+   * individual player has set.
+   */
+  notGoodEnoughReroll: "notGoodEnoughReroll",
+  /**
+   * Skip the Not Good Enough prompt and reroll the 1s and 2s outright.
+   *
+   * **Client-scoped, and the only setting in this module a player owns.** The
+   * rule is not a choice the table makes once — a player who always takes the
+   * reroll (which is nearly everyone, since the card costs nothing to use) does
+   * not want a dialog on every attack, while one who likes deciding case by case
+   * does. That is a per-person preference, and a world-scoped switch would make
+   * one of them wrong.
+   *
+   * **Also the only setting registered `config: true`.** Every window this module
+   * puts in Foundry's settings category is `restricted: true`, so there is
+   * nowhere else a player could reach this; it therefore sits directly in the
+   * module's category, where for a player it is the only thing there. Never add
+   * it to a settings window as well — see the note at the top of `settings.ts`.
+   *
+   * Written from two places: the checkbox in that category, and the "always
+   * reroll" box on the prompt itself, which is how a player turns it on at the
+   * moment they realise they want it rather than by going looking.
+   */
+  notGoodEnoughAlwaysReroll: "notGoodEnoughAlwaysReroll",
+  /**
    * Repoint a portrait raised by Ginzzzu's Portraits & NPC Dock when the actor's
    * artwork changes underneath it — something that module doesn't do for `img`.
    * World-scoped for consistency with the other feature switches, even though the
@@ -446,6 +496,21 @@ export const FLAGS = {
    * — or one left by a delete that failed halfway — is read rather than ignored.
    */
   giftedTracker: "giftedTracker",
+  /**
+   * Marks the ActiveEffect standing for a **Close-Knit** already spent this long
+   * rest, and records what it bought: `{ allyUuid, allyName, amount }`.
+   *
+   * The effect *is* the record. The card is "once per long rest" and the action
+   * carrying it is derived rather than written to the Item, so the system's own
+   * `uses` counter is unavailable — recording a use there would mean writing half
+   * an action to the card's source. See `daggerheart/close-knit.ts` for why.
+   *
+   * `system.duration.type` is `longRest`, so the system expires it at the next
+   * long rest exactly as it expires a Crimson Rite. Deleting it by hand hands the
+   * use back, which is the escape hatch for a world that has turned the system's
+   * effect expiry off. An effect built by hand without this flag is left alone.
+   */
+  closeKnit: "closeKnit",
 } as const;
 
 /** Foundry template paths (served from the module root at runtime). */

@@ -2,12 +2,18 @@
  * Registers the module's settings with Foundry. Must be called during the `init`
  * hook (settings cannot be registered later).
  *
- * **Every setting here is `config: false`.** Foundry would otherwise list them
- * flat under the module's category, and this module has enough of them that they
- * read better grouped. So the module's category contains only the buttons
- * registered at the bottom of this file, each opening a window that owns its
- * group — and a setting must never be both `config: true` and editable in a
+ * **Every setting here is `config: false`, bar one.** Foundry would otherwise
+ * list them flat under the module's category, and this module has enough of them
+ * that they read better grouped. So the module's category contains only the
+ * buttons registered at the bottom of this file, each opening a window that owns
+ * its group — and a setting must never be both `config: true` and editable in a
  * window, or the same control appears twice.
+ *
+ * The exception is `notGoodEnoughAlwaysReroll`, which is client-scoped and
+ * therefore belongs to the *player*. Every window here is `restricted: true`, so
+ * a player who opened the module's category would otherwise find it empty — that
+ * one checkbox is the only control in this module they own, and it has nowhere
+ * else to live. It is deliberately not in any window, for the reason above.
  *
  * Menus are listed in registration order, which is why they are all together at
  * the end rather than next to the settings they edit.
@@ -17,6 +23,7 @@ import { DaggerheartUtilitiesConfig } from "./apps/daggerheart-utilities-config.
 import { GeneralFeaturesConfig } from "./apps/general-features-config.js";
 import { SessionLogConfig } from "./apps/session-log-config.js";
 import { MENUS, MODULE_ID, SETTINGS } from "./constants.js";
+import { reconcileCloseKnitCards } from "./daggerheart/close-knit.js";
 import { reconcileCompanionCards } from "./daggerheart/companion.js";
 import { DECK_CARD_TYPES, DEFAULT_DECK_LIMIT } from "./daggerheart/deck-limit.js";
 import { reconcileReach } from "./daggerheart/reach.js";
@@ -150,9 +157,10 @@ export function registerSettings(): void {
     onChange: () => refreshTokenBar(),
   });
 
-  // The only client-scoped setting in the module — see SETTINGS.tokenBarPosition
-  // in constants.ts. Written by dragging the bar, never by a window, and a player
-  // has to be able to write their own, which a world-scoped setting would forbid.
+  // Client-scoped — see SETTINGS.tokenBarPosition in constants.ts. Written by
+  // dragging the bar, never by a window, and a player has to be able to write
+  // their own, which a world-scoped setting would forbid. One of two client
+  // settings in the module; the other is notGoodEnoughAlwaysReroll below.
   game.settings.register(MODULE_ID, SETTINGS.tokenBarPosition, {
     scope: "client",
     config: false,
@@ -333,6 +341,46 @@ export function registerSettings(): void {
     // Same reason as Reach: the buttons are added as documents are prepared, and
     // nothing re-prepares an open sheet on its own.
     onChange: () => reconcileCompanionCards(),
+  });
+
+  // World-scoped for the same reason as Companion, and it shares the mechanism:
+  // the action is built during data preparation on every client that prepares the
+  // card, so a per-user answer would put a button on one screen and not another.
+  game.settings.register(MODULE_ID, SETTINGS.closeKnitShareHope, {
+    name: "EE.Settings.CloseKnitShareHope.Name",
+    hint: "EE.Settings.CloseKnitShareHope.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+    // Same reason as Reach and Companion: the button is added as documents are
+    // prepared, and nothing re-prepares an open sheet on its own.
+    onChange: () => reconcileCloseKnitCards(),
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.notGoodEnoughReroll, {
+    name: "EE.Settings.NotGoodEnoughReroll.Name",
+    hint: "EE.Settings.NotGoodEnoughReroll.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+    // No onChange: this is read per damage roll rather than baked into a card, so
+    // switching it takes effect on the next one with nothing to reconcile.
+  });
+
+  // The one client-scoped, player-facing setting — see the note at the top of
+  // this file, and SETTINGS.notGoodEnoughAlwaysReroll in constants.ts. Off by
+  // default: a card that has just appeared should ask the first time rather than
+  // silently change a roll the player has not seen it change before.
+  game.settings.register(MODULE_ID, SETTINGS.notGoodEnoughAlwaysReroll, {
+    name: "EE.Settings.NotGoodEnoughAlwaysReroll.Name",
+    hint: "EE.Settings.NotGoodEnoughAlwaysReroll.Hint",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false,
+    // No onChange: nothing is rendered from it — the next damage roll reads it.
   });
 
   // World-scoped: only a GM can write actor documents, and the artwork this

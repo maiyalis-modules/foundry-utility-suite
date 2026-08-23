@@ -687,3 +687,253 @@ export async function askText(request: TextRequest): Promise<string | null> {
 
   return text.length > 0 ? text : null;
 }
+
+/** One entry in a {@link chooseFromList} dropdown. */
+export interface ListChoice {
+  /** What the answer identifies this entry by. */
+  value: string;
+  /** Localized text in the dropdown. */
+  label: string;
+}
+
+/** Everything needed to raise a {@link chooseFromList} prompt. */
+export interface ListRequest {
+  title: string;
+  /** The question as a sentence. */
+  intro: string;
+  /** The entries, in the order they should read. */
+  options: readonly ListChoice[];
+  /** Which entry is selected when the dialog opens. Defaults to the first. */
+  initial?: string;
+  /** Localized confirm button. */
+  confirmLabel: string;
+  /** Localized cancel button. */
+  cancelLabel: string;
+}
+
+/**
+ * Ask which *one* entry of a list, as a dropdown. Returns the value, or null for
+ * a dialog that was cancelled or dismissed.
+ *
+ * ## Why this isn't {@link chooseOne}
+ *
+ * That one gives every option a button, which is right when the options are few
+ * and each deserves its own weight ("primary weapon or secondary?"). This one is
+ * for a list that is merely *long* — a count, a die size, a rank — where a row of
+ * six identically-shaped buttons reads as a wall rather than as a choice, and the
+ * answer is one field with an obvious default. Same reason the system's own roll
+ * dialog uses a `<select>` for advantage rather than three buttons.
+ *
+ * The value comes back off the form at submit time rather than being recorded on
+ * click, which is safe here in a way it is not in `actor-picker.ts`: nothing
+ * filters this list, so the `<option>` the player chose is still in the document
+ * when they confirm.
+ *
+ * No timeout, for the same reason as {@link chooseOne}: this is raised after an
+ * action has resolved, so nothing is being held back while the player decides.
+ */
+export async function chooseFromList(request: ListRequest): Promise<string | null> {
+  const { title, intro, options, initial, confirmLabel, cancelLabel } = request;
+  if (options.length === 0) return null;
+
+  const { DialogV2 } = foundry.applications.api;
+
+  const chosen = options.some((option) => option.value === initial)
+    ? initial
+    : options[0]!.value;
+
+  const markup = options
+    .map(
+      (option) =>
+        `<option value="${escapeHtml(option.value)}"${
+          option.value === chosen ? " selected" : ""
+        }>${escapeHtml(option.label)}</option>`,
+    )
+    .join("");
+
+  const answer = await DialogV2.wait({
+    classes: ["ee-feature-prompt"],
+    window: { title },
+    content: `<p>${escapeHtml(intro)}</p>
+      <select class="ee-feature-select" name="choice">${markup}</select>`,
+    buttons: [
+      {
+        action: "confirm",
+        label: confirmLabel,
+        default: true,
+        callback: (_event: Event, button: AnyObject) => ({
+          choice: String(button?.["form"]?.elements?.["choice"]?.value ?? ""),
+        }),
+      },
+      { action: "cancel", label: cancelLabel },
+    ],
+    rejectClose: false,
+  }).catch(() => null);
+
+  const value = String((answer as AnyObject | null)?.["choice"] ?? "");
+  // Re-checked against the list this function rendered rather than trusted from
+  // the form, the way the other prompts do it.
+  return options.some((option) => option.value === value) ? value : null;
+}
+
+/**
+ * Face counts the system ships artwork for.
+ *
+ * Its `.dice` rule masks in a die shape from `--svg-die`, which is set by a
+ * `.d4`/`.d6`/… class; a denomination it has no file for would leave the mask
+ * undefined and render as a bare rectangle, so those get a shape of their own
+ * instead. See {@link renderDice}.
+ */
+const DIE_SHAPES = new Set([4, 6, 8, 10, 12, 20]);
+
+/** One die on a {@link confirmWithToggle} prompt. */
+export interface PromptDie {
+  /** The face that came up. */
+  value: number;
+  /** How many sides it has, which picks the shape drawn behind the number. */
+  faces: number;
+  /** Draw it in the colour that says "this one is what the question is about". */
+  marked?: boolean;
+}
+
+/**
+ * The dice as the player is looking at them.
+ *
+ * Deliberately built on the **system's own `.dice` class**, which — unlike the
+ * rest of its roll styling — is a global rule rather than one scoped to a chat
+ * message, so the chips here are masked from the same die artwork the chat card
+ * uses. A prompt asking about dice that have just landed should show the dice
+ * that landed, not a second visual vocabulary for them. `module.css` adds only
+ * the centring the chat log gets from `.roll-die > div`, and the marked colour.
+ */
+function renderDice(dice: readonly PromptDie[]): string {
+  const chips = dice
+    .map((die) => {
+      const shape = DIE_SHAPES.has(die.faces) ? `d${die.faces}` : "ee-feature-die-plain";
+      const marked = die.marked === true ? " ee-feature-die-marked" : "";
+      return `<div class="dice ${shape}${marked}">${escapeHtml(String(die.value))}</div>`;
+    })
+    .join("");
+
+  return `<div class="ee-feature-dice">${chips}</div>`;
+}
+
+/** The "and don't ask again" box on a {@link confirmWithToggle} prompt. */
+export interface PromptToggle {
+  /** Localized label beside the checkbox. */
+  label: string;
+  /** Localized line under it, saying what ticking it changes. */
+  hint?: string;
+  /**
+   * Take the decline button away while it is ticked.
+   *
+   * For a box that means *"always do this from now on"*, which is a sentence the
+   * decline button contradicts: a player who has just said "never ask me again"
+   * and then presses "leave the roll alone" has told the dialog two opposite
+   * things, and whichever one it obeyed would be a surprise. Disabling the button
+   * says which of the two the box wins, before the click rather than after it.
+   */
+  locksDecline?: boolean;
+}
+
+/** Everything needed to raise a {@link confirmWithToggle} prompt. */
+export interface ToggleRequest extends ConfirmRequest {
+  toggle: PromptToggle;
+  /**
+   * Dice to show between the question and the box.
+   *
+   * For a question *about* dice that have already landed, where naming them in
+   * the sentence ("came up 6, 2, 1") makes the reader match numbers to a rule
+   * by hand. Showing them lets the colour do it instead, and leaves the sentence
+   * free to ask the question.
+   */
+  dice?: readonly PromptDie[];
+}
+
+/** What a {@link confirmWithToggle} prompt comes back with. */
+export interface ToggleAnswer {
+  /** Whether the confirm button was pressed. */
+  confirmed: boolean;
+  /** Whether the box was ticked when it was. Always false on a decline. */
+  toggled: boolean;
+}
+
+/**
+ * Ask one yes/no question with a "from now on" box under it.
+ *
+ * ## Why this isn't {@link confirmChoice}
+ *
+ * The question is the same shape; the answer is not. This one comes back as two
+ * booleans, because the box is a *second* decision — about every future roll
+ * rather than this one — and folding it into the first would mean the caller
+ * could not tell "yes, once" from "yes, always". Keeping it out of
+ * `confirmChoice` also keeps that function honest for the eight callers that
+ * have nothing to remember.
+ *
+ * The box is never pre-ticked. A caller only raises this when the standing
+ * preference is *off* — with it on there is nothing to ask — so a ticked box
+ * would be showing the player a setting they do not have.
+ *
+ * Acting on {@link ToggleAnswer.toggled} is the caller's job, and it is
+ * deliberately not done here: this file writes no settings and knows no feature.
+ */
+export async function confirmWithToggle(request: ToggleRequest): Promise<ToggleAnswer> {
+  const { title, intro, headline, confirmLabel, declineLabel, toggle, dice } = request;
+
+  const banner = headline ? renderHeadline(headline) : "";
+  const faces = dice && dice.length > 0 ? renderDice(dice) : "";
+  const hint = toggle.hint ? `<p class="hint">${escapeHtml(toggle.hint)}</p>` : "";
+
+  const answer = await waitWithTimeout(
+    {
+      classes: ["ee-feature-prompt"],
+      window: { title },
+      content: `${banner}<p>${escapeHtml(intro)}</p>${faces}
+        <label class="ee-feature-toggle">
+          <input type="checkbox" name="toggle">
+          <span class="ee-feature-toggle-label">${escapeHtml(toggle.label)}</span>
+          ${hint}
+        </label>`,
+      buttons: [
+        {
+          action: "confirm",
+          label: confirmLabel,
+          default: true,
+          callback: (_event: Event, button: AnyObject) => ({
+            confirmed: true,
+            toggled: button?.["form"]?.elements?.["toggle"]?.checked === true,
+          }),
+        },
+        { action: "skip", label: declineLabel },
+      ],
+    },
+    toggle.locksDecline === true ? lockDeclineWhileTicked : undefined,
+  );
+
+  const result = answer as AnyObject | null;
+  // Anything that isn't the confirm button's own return — the decline action's
+  // bare string, a dismissal, the timeout — is a no, and a no never remembers.
+  return result?.["confirmed"] === true
+    ? { confirmed: true, toggled: result["toggled"] === true }
+    : { confirmed: false, toggled: false };
+}
+
+/**
+ * Grey out the decline button for as long as the box is ticked.
+ *
+ * Wired on `render` rather than baked into the markup because DialogV2 builds the
+ * buttons itself — `data-action` is the only handle on them, and it exists only
+ * once the dialog is on screen.
+ */
+function lockDeclineWhileTicked(root: HTMLElement): void {
+  const box = root.querySelector<HTMLInputElement>("input[name='toggle']");
+  const decline = root.querySelector<HTMLButtonElement>("button[data-action='skip']");
+  if (!box || !decline) return;
+
+  const sync = (): void => {
+    decline.disabled = box.checked;
+  };
+
+  box.addEventListener("change", sync);
+  sync();
+}

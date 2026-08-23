@@ -14,6 +14,7 @@ import { registerAdversaryAttack } from "./daggerheart/adversary-attack.js";
 import { registerBloodMaledict } from "./daggerheart/blood-maledict.js";
 import { registerBloodSpike } from "./daggerheart/blood-spike.js";
 import { registerCardTargeting } from "./daggerheart/card-targeting.js";
+import { registerCloseKnit } from "./daggerheart/close-knit.js";
 import { registerCompanion } from "./daggerheart/companion.js";
 import { registerCrimsonRite } from "./daggerheart/crimson-rite.js";
 import { registerDualityOutcome } from "./daggerheart/duality-outcome.js";
@@ -23,6 +24,7 @@ import { registerGiftedTracker } from "./daggerheart/gifted-tracker.js";
 import { registerHoldThemOff } from "./daggerheart/hold-them-off.js";
 import { registerISeeItComing } from "./daggerheart/i-see-it-coming.js";
 import { registerGmEffects } from "./daggerheart/gm-effects.js";
+import { registerNotGoodEnough } from "./daggerheart/not-good-enough.js";
 import { registerRangersFocus } from "./daggerheart/rangers-focus.js";
 import { registerReach } from "./daggerheart/reach.js";
 import { installRollPipeline } from "./daggerheart/roll-pipeline.js";
@@ -59,6 +61,11 @@ Hooks.once("init", async () => {
   // ranger's ancestry says about their own arms. See `CachedActions.ranges`.
   registerReach();
   registerCompanion();
+  // A third patch on the same seam, and the only one with no ordering to respect:
+  // it adds a button to one community card and touches nothing Reach or Companion
+  // reads. Here rather than down with the roll windows because, like Crimson Rite,
+  // it is activated by an action and takes no part in the pipeline's ordering.
+  registerCloseKnit();
   // Feature automation: every window declares itself, then every feature
   // registers into one, and only then is the system's roll pipeline patched —
   // `installRollPipeline` runs the windows in registration order, so it has to
@@ -101,6 +108,10 @@ Hooks.once("init", async () => {
   // weapon attack is neither a spellcast nor an adversary's roll, so no other
   // window is looking at it.
   registerHoldThemOff();
+  // The only window on a *damage* roll rather than an attack or a Duality, so
+  // nothing else is looking at what it changes and its place in this list costs
+  // nothing. It has to be registered before `installRollPipeline` all the same.
+  registerNotGoodEnough();
   installRollPipeline();
   // Not a roll window: Crimson Rite is activated by an action and delivered as a
   // standing ActiveEffect, so it hooks the system directly and takes no part in

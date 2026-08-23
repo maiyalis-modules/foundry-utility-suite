@@ -700,6 +700,67 @@
   font-family: inherit;
 }
 
+/* The dropdown prompt (`chooseFromList`). Full width like the textarea above it,
+ * so the field reads as the answer to the sentence rather than as a control
+ * floating beside one. */
+.ee-feature-prompt .ee-feature-select {
+  width: 100%;
+  font-family: inherit;
+}
+
+/* The "and don't ask again" box on a confirmWithToggle prompt. Laid out like
+ * `.ee-feature-offer` above — box, label, hint under the label rather than
+ * under the box — so the two read as the same kind of control even though one
+ * is a list of features and this one is a preference. */
+.ee-feature-prompt .ee-feature-toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin: 0.75rem 0 0.25rem;
+  cursor: pointer;
+}
+
+.ee-feature-prompt .ee-feature-toggle .hint {
+  grid-column: 2;
+  margin: 0.15rem 0 0;
+}
+
+/* The dice on a confirmWithToggle prompt. The chips are the *system's* `.dice`
+ * class, which is one of the few roll rules it leaves unscoped by `.chat-message`
+ * — so the die shape masked in behind the number is the same artwork the chat
+ * card draws. Only two things are missing outside the chat log: the centring the
+ * card gets from `.roll-die > div`, and a colour for the number. */
+.ee-feature-prompt .ee-feature-dice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.ee-feature-prompt .ee-feature-dice .dice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Fixed rather than themed: the die art is the same cream-to-brown gradient in
+   * either theme, so a number that followed the theme would vanish into it. */
+  color: #f7f3e8;
+  font-weight: bold;
+}
+
+/* The dice the question is about. The system's own disadvantage-die red, so a
+ * singled-out die reads as singled out rather than as an error. */
+.ee-feature-prompt .ee-feature-dice .dice.ee-feature-die-marked::before {
+  background: linear-gradient(139.01deg, #e54e4e 3.51%, #3c0000 82.19%);
+}
+
+/* A denomination the system ships no artwork for leaves `--svg-die` unset, and
+ * an undefined mask renders as a bare rectangle. Give it a shape instead. */
+.ee-feature-prompt .ee-feature-dice .dice.ee-feature-die-plain::before {
+  mask: none;
+  border-radius: 4px;
+}
+
 /* ---------------------------------------------------------------------------
  * The actor picker (`actor-picker.ts`) — search, chosen chips, results.
  * ------------------------------------------------------------------------- */

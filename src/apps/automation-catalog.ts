@@ -159,7 +159,23 @@ const COMMUNITIES: Catalog = {
     fromVoid("Duneborne"),
     fromVoid("Freeborne"),
     fromVoid("Frostborne"),
-    fromVoid("Hearthborne"),
+    {
+      id: "hearthborne",
+      label: "Hearthborne",
+      fromVoid: true,
+      groups: [
+        {
+          legend: "EE.Automation.FeaturesLegend",
+          settings: [
+            {
+              key: SETTINGS.closeKnitShareHope,
+              name: "EE.Settings.CloseKnitShareHope.Name",
+              hint: "EE.Settings.CloseKnitShareHope.Hint",
+            },
+          ],
+        },
+      ],
+    },
     fromVoid("Reborne"),
     fromVoid("Warborne"),
   ],
@@ -272,7 +288,22 @@ const DOMAINS: Catalog = {
   selectLabel: "EE.Automation.SelectDomain",
   entries: [
     plain("Arcana"),
-    plain("Blade"),
+    {
+      id: "blade",
+      label: "Blade",
+      groups: [
+        {
+          legend: "EE.Automation.DomainCardsLegend",
+          settings: [
+            {
+              key: SETTINGS.notGoodEnoughReroll,
+              name: "EE.Settings.NotGoodEnoughReroll.Name",
+              hint: "EE.Settings.NotGoodEnoughReroll.Hint",
+            },
+          ],
+        },
+      ],
+    },
     {
       id: "bone",
       label: "Bone",

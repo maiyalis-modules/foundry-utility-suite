@@ -110,9 +110,10 @@ loads).
   - Plain DOM appended to the **body**, not an ApplicationV2 window, following
     `../daggerheart-spotlight-tracker/src/ui/spotlight-bar.ts` (where a
     standalone window was built and removed as too heavy). Dragged by its header
-    via pointer capture; the position is the module's **only client-scoped
-    setting** (`tokenBarPosition`) — it's one user's window layout, and a player
-    has to be able to write it, which world scope would forbid. Clamped back into
+    via pointer capture; the position is one of the module's two client-scoped
+    settings (`tokenBarPosition`; the other is `notGoodEnoughAlwaysReroll`) —
+    it's one user's window layout, and a player has to be able to write it,
+    which world scope would forbid. Clamped back into
     the viewport on create, drag-end and window resize.
 - **Per-actor hotbar pages** (`src/hotbar/hotbar-pages.ts`, `hotbar-pages-app.ts`) —
   selecting a token swaps the hotbar to the page assigned to its actor; anything
@@ -1187,6 +1188,165 @@ loads).
     there. `roll.success` is left `undefined` by `buildEvaluate` when there is
     neither a target nor a difficulty — the Command roll's normal case — so only
     an explicit `false` stands the note down.
+- **Close-Knit** (`src/daggerheart/close-knit.ts`) — the Hearthborne community's
+  (*Void for Daggerheart*) "Once per long rest, you can spend any number of Hope
+  to give an ally the same number of Hope." World setting `closeKnitShareHope`,
+  **on** by default, filed under Hearthborne in the Communities tab.
+  - **The Void ships nothing** — `featureForm: "passive"`, `resource: null`,
+    `actions: {}`. Worth knowing *why*, because two of the card's three clauses
+    are natively expressible and the SRD uses both: "spend any number of Hope" is
+    a **scalable cost** (`{ key: "hope", value: 1, scalable: true, step: 1 }`),
+    which `CostField.calcCosts` turns into a slider capped at
+    `maxStep = floor((max - value) / step)` and which `requireConfigurationDialog`
+    shows for any costed action with no roll; "once per long rest" is
+    `uses: { max: "1", recovery: "longRest" }`, exactly as Weapon Specialist
+    declares its Slayer Dice reroll. The third clause is the one the schema cannot
+    say — the only way to move a resource onto *somebody else* is a `healing`
+    action, which needs a declared target, a targeted token on the canvas, and a
+    trip through `DamageField.execute`'s damage-roll dialog.
+  - **One derived `effect` action, and two house prompts behind it.** `effect`
+    rather than `base`: `base` is in `actionsTypes` but has **no** entry in
+    `CONFIG.DH.ACTIONS.actionTypes`, so its icon and tag resolve to `undefined`.
+    `effect` is what the SRD itself uses for this shape (Adaptability's "Mark
+    Stress", No Mercy's "Spend Hope"). With `effects: []` and `target.type: null`
+    it does nothing on its own — `EffectsField.execute` returns early on
+    `!config.hasEffect`, `TargetField#prepareConfig` on a null target type. One
+    action on the card also means `Item#use` runs it directly rather than raising
+    `ActionSelectionDialog`, so clicking the feature *is* the button.
+  - **The cost is deliberately not declared on the action.** A native scalable
+    cost is charged by `CostField.execute` (workflow order 150) long before
+    `postUseAction`, so it would take the Hope and *then* ask who receives it —
+    leaving a refund to write for every way a player can close a dialog. Asking
+    both questions first means there is no half-state to undo. `chatDisplay:
+    false` for the same reason: what goes to chat is the announcement, once the
+    Hope has actually moved.
+  - **The Hope moves by `Actor#modifyResource`,** which relays through
+    `emitGMUpdate` — this is the same path that lets a player mark an adversary's
+    Stress, and it is why a player can add Hope to a character they don't own. Note
+    `emitAsGM` sends *every* non-GM change over the socket, including a character's
+    changes to their own sheet, so with no GM connected **neither** half would land
+    while the marker and the chat line (written by this client) would. Hence the
+    `game.users.activeGM` gate in `refusal()`.
+  - **The rest limit is an ActiveEffect, not the action's `uses`,** and that is
+    forced by the action being derived: `UsesField.execute` records a use with
+    `action.update({ "uses.value": n })` → `item.update({ "system.actions.<id>":
+    … })`, a database write describing an action that only exists while this
+    module is installed, and `RefreshFeatures` would write to the same place. So
+    the marker is an effect with `system.duration.type = "longRest"`, the
+    mechanism `crimson-rite.ts` already uses; `expireActiveEffects` clears it at a
+    long rest and a GM can delete it by hand. `autoExpireActiveEffects` being off
+    is a **worse** failure here than for Crimson Rite (a card that never comes
+    back, rather than a rite that never ends), hence the warning at activation and
+    the how-to-clear-it line in the effect's own description.
+  - **Third patch on `Item#prepareEmbeddedDocuments`** after Reach and Companion,
+    and the only one with no ordering to respect. Same reasoning as both: nothing
+    is written to the database, so the rule un-applies itself, and
+    `reconcileCloseKnitCards` exists for the setting changing mid-session. Three
+    file-local copies of that prototype-patch helper now exist — an extraction
+    candidate, deliberately not taken while Reach and Companion are working.
+  - **Two house prompts rather than a bespoke dialog**: `chooseOne` rows for the
+    ally (portrait, name, their Hope over their max), then `chooseFromList` for
+    the amount. Neither has a timeout, because nothing is being held back while
+    they are open.
+  - `feature-prompt.ts` grew **`chooseFromList`**, a `<select>` with confirm and
+    cancel. The amount started as `chooseOne`'s buttons and a row of six
+    identically-shaped "N Hope" buttons reads as a wall rather than as a choice —
+    the split is *few options each deserving weight* (buttons) against *a merely
+    long list with an obvious default* (dropdown), the same call the system's own
+    roll dialog makes for advantage. It opens on the recipient's headroom, the
+    largest amount that would not be wasted. Reading the value off the form at
+    submit time is safe here in a way it is not in `actor-picker.ts`: nothing
+    filters this list, so the chosen `<option>` is still in the document.
+  - **The ally list** is every other `character` assigned to a user, plus any on
+    the current scene, falling back to the whole actor directory only if both come
+    up empty — a world with a party shouldn't have to scroll past retired ones.
+  - **Deliberately not clamped to the recipient's headroom.** The card says "any
+    number"; `modifyResource` caps the receiving end, so overspending spends it
+    all. The headroom is shown while choosing and the overspill is said out loud
+    afterwards rather than silently swallowed.
+- **Not Good Enough** (`src/daggerheart/not-good-enough.ts`) — the Blade domain's
+  (SRD level 1) "When you roll your damage dice, you can reroll any 1s or 2s."
+  Two settings: world `notGoodEnoughReroll`, **on** by default, filed under Blade
+  in the Domains tab; and client `notGoodEnoughAlwaysReroll`, **off** by default.
+  - **The one window on a damage roll.** `DamageRoll.buildPost` reaches
+    `DHRoll.buildPost` — the patched seam — through `super`, so damage arrives at
+    the pipeline like anything else. What makes it fit this card is the two lines
+    `DamageRoll.buildPost` runs *first*: it builds a `PoolTerm` of
+    `config.damage.main` plus the resource rolls and `await`s
+    `triggerChatRollFx`. So the table has already watched the dice land when the
+    window is asked, and nothing has been posted or applied yet. **Do not call
+    `showDiceEarly` here** — it would throw the same dice twice.
+  - **`matches` cannot use `rollTypeOf`.** `DamageField.execute` spreads the
+    *action's* config into the damage config, so `config.roll.type` at
+    `daggerheart.preRoll` is the attack's `actionType`. It asks
+    `CONFIG.Dice.daggerheart.DamageRoll` directly instead.
+  - **Reroll in place, not `rebuildRoll`.** That helper re-rolls the whole
+    formula, which is the opposite of this card: the 6 has to survive. So it calls
+    the system's own `BaseDie#rerollResult` — the method behind the per-die reroll
+    button already on every damage card — which keeps the discarded result in
+    `results` marked `rerolled`/`active: false`, splices the replacement into the
+    die's own order, and handles combo dice (`c`/`cc`). `Roll.fromData` resolves
+    the serialized `"BaseDie"` through `Object.values(CONFIG.Dice.terms).find(c =>
+    c.name === data.class)`, since `CONFIG.Dice.termTypes` holds only the Duality
+    dice — so the reconstructed `config.damage.main` really does carry the method.
+  - **"Only once" needs no state.** `rerollResult` marks the *replacement*
+    `rerolled = true` as well as the result it replaced, which is how the system
+    stops its own button offering a second go. Reading the same flag means this
+    window, a second damage roll and the card's chat button all agree, with no
+    counter to keep.
+  - **Totals are recomputed, not written.** `Roll#_evaluate` skips evaluated terms
+    and re-reads `total`, and `DiceTerm#total` sums the *active* results each time
+    it is asked. A `ParentheticalTerm` is the exception — its total is its inner
+    roll's cached `_total`, which is how the system wraps a formula it is about to
+    multiply — hence the innermost-first recursion in `recompute`. Dice inside a
+    `PoolTerm` are deliberately out of reach for the same reason inverted: a
+    pool's total is fixed at evaluation, so `diceTermsOf` walks `terms` by hand
+    rather than using `Roll#dice`, which would reach into one.
+  - **The replacement dice are animated**, in the stand-in-object shape the
+    system uses in `ChatDamageData#rerollDamageDie` (`{ _evaluated: true, dice,
+    options }` — a `Die` built from results is not `_evaluated`, so
+    `Roll.fromTerms` would refuse it), with the whisper/blind pair worked out the
+    way `DamageRoll.buildPost` works it out. Without it the card's numbers would
+    simply differ from the ones the table just watched.
+  - **`main` only.** Stress, healing and other resource formulas on the same
+    action are left alone: `config.damage.main` is the only part the system itself
+    treats as damage, and it is the only one `constructFormula` gives the damage
+    bonuses and the critical bonus to.
+  - **The loadout is checked.** A `domainCard` in the vault is inert, and
+    `DhActiveEffect#isSuppressed` branches on `system.isVaultSupressed` (the
+    system's typo) and `system.isDomainTouchedSuppressed`. `FeatureMatch` also
+    needs `itemTypes: ["domainCard"]`, since it defaults to `["feature"]`.
+  - **The player owns half of this**, which no other setting in the module does.
+    "Always reroll" is a preference about being *asked*, and one player taking it
+    every time while another decides case by case are both right — so it is
+    client-scoped. It is also **the only `config: true` setting in the module**:
+    every settings window here is `restricted: true`, so a player has nowhere else
+    to reach it. Never add it to a window as well. It is written from two places —
+    that checkbox, and the "Always reroll 1s and 2s" box on the prompt itself,
+    which is where a player is standing when they realise they want it.
+  - `feature-prompt.ts` grew **`confirmWithToggle`**: `confirmChoice` plus a "from
+    now on" box, answering with two booleans rather than one so a caller can tell
+    "yes, once" from "yes, always". `locksDecline` greys out the decline button
+    while the box is ticked — "never ask me again" and "leave this roll alone" are
+    contradictory instructions, and disabling the button says which one wins
+    before the click rather than after it. The box is never pre-ticked: a caller
+    only raises this when the preference is off.
+  - It also grew **`ToggleRequest.dice`**, a strip of `PromptDie` between the
+    question and the box. The chips are the **system's own `.dice` class**, which
+    is one of the few roll rules it leaves unscoped by `.chat-message`, so the
+    shape masked in behind each number is the same artwork the chat card draws;
+    `module.css` adds only the centring the card gets from `.roll-die > div`, a
+    fixed light number colour (the die gradient is the same in either theme), the
+    marked colour, and a fallback shape for a denomination the system ships no
+    SVG for. The rerollable ones are marked **by identity** against the list
+    `lowResultsOf` already returned, not by re-testing the face value — "is a 1 or
+    2" and "still has its reroll" are two conditions, and a die shown marked that
+    the reroll then skips is the one lie this dialog could tell. That is what
+    `LowResult.result` is for. This replaced an intro that named the faces in
+    prose ("came up 6, 2, 1, for 12"), which made the reader apply the rule by
+    hand; the colour does it instead, and the sentence is free to ask the
+    question. There is no hint under the box for the same reason — the label is
+    one line, and the notification after a tick says where the preference went.
 - **Card targeting** (`src/daggerheart/card-targeting.ts`) — the single wrapper
   around `DHBaseAction#use` behind every card that declares a target it must not
   ask for. Features register a predicate with `untargetAction(rule)`; the patch
@@ -1412,12 +1572,16 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
   silent during play; `warn` is for anything the GM can act on.
 - **Settings**: add a key to `SETTINGS` in `constants.ts`, register it in
   `settings.ts`, which is called during the `init` hook (settings can't be
-  registered later). **Every setting is `config: false`** — the module's category
-  in Foundry's settings list holds only buttons (General Features, Per-Token
-  Hotbars, Daggerheart Automation, Daggerheart Utilities, Session Log), each
-  opening a window that owns its group. A new setting belongs in one of those
+  registered later). **Every setting is `config: false` bar one** — the module's
+  category in Foundry's settings list holds only buttons (General Features,
+  Per-Token Hotbars, Daggerheart Automation, Daggerheart Utilities, Session Log),
+  each opening a window that owns its group. A new setting belongs in one of those
   windows, not in the flat list; a setting must never be both `config: true` and
-  window-edited or the same control appears twice. Menus render in registration
+  window-edited or the same control appears twice. The exception is
+  `notGoodEnoughAlwaysReroll`: every one of those menus is `restricted: true`, so
+  a *client-scoped, player-owned* setting has nowhere to live and goes in the flat
+  list instead. That is the bar a second one has to clear — client scope **and**
+  no window a player can open — not "it felt easier". Menus render in registration
   order, which is why they are all registered together at the end of
   `settings.ts`. A window lists its boolean keys in `settingKeys` and its numeric
   ones in `numberSettingKeys`; `ConfigWindow#onSave` reads each back off the
@@ -1428,12 +1592,12 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     The Daggerheart Automation window has a "General" tab plus one tab per kind of
     character content — Ancestries, Communities, Classes, Domains — and a rule is
     filed under the card that prints it (Fearless under Infernis, Adaptability
-    under Human; Blood Maledict,
+    under Human, Close-Knit under Hearthborne; Blood Maledict,
     Crimson Rite and Hybrid Form under Blood Hunter; Hold Them Off, Ranger's
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
-    Tracker under Sage). A subclass has no home of its own, so its rules are
-    filed under its parent class in a group of their own — Hybrid Form under
+    Tracker under Sage, Not Good Enough under Blade). A subclass has no home of
+    its own, so its rules are filed under its parent class in a group of their own — Hybrid Form under
     Blood Hunter, Beastbound under Ranger. All four
     content tabs render
     the *same* template from data in `src/apps/automation-catalog.ts`, so adding a
