@@ -17,6 +17,7 @@ import { DaggerheartUtilitiesConfig } from "./apps/daggerheart-utilities-config.
 import { GeneralFeaturesConfig } from "./apps/general-features-config.js";
 import { SessionLogConfig } from "./apps/session-log-config.js";
 import { MENUS, MODULE_ID, SETTINGS } from "./constants.js";
+import { reconcileCompanionCards } from "./daggerheart/companion.js";
 import { DECK_CARD_TYPES, DEFAULT_DECK_LIMIT } from "./daggerheart/deck-limit.js";
 import { reconcileReach } from "./daggerheart/reach.js";
 import { HotbarPagesConfig } from "./hotbar/hotbar-pages-app.js";
@@ -217,6 +218,19 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // Same reasoning again. Nothing to reconcile on change either, and for a
+  // slightly different reason than Fearless: the switch is read when a card is
+  // rendered *and* again when its button is pressed, so a card already on screen
+  // when the GM turns this off is inert rather than stale.
+  game.settings.register(MODULE_ID, SETTINGS.adaptabilityReroll, {
+    name: "EE.Settings.AdaptabilityReroll.Name",
+    hint: "EE.Settings.AdaptabilityReroll.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   // World-scoped for the same reason, and doubly so here: the roll happens on the
   // GM's client while the prompt appears on the player's, so a per-client answer
   // would let the two ends disagree about whether the reaction exists.
@@ -290,6 +304,35 @@ export function registerSettings(): void {
     config: false,
     type: Boolean,
     default: true,
+  });
+
+  // World-scoped, and here it is not merely for consistency: the card is pressed
+  // on the player's client, the quarry is chosen on the GM's, and the Evasion
+  // bonus is applied on whichever client rolled the attack. Three machines have
+  // to agree that this feature exists, so it cannot be a per-client preference.
+  game.settings.register(MODULE_ID, SETTINGS.giftedTrackerEvasion, {
+    name: "EE.Settings.GiftedTrackerEvasion.Name",
+    hint: "EE.Settings.GiftedTrackerEvasion.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
+  // World-scoped for a reason beyond consistency here too: the actions this adds
+  // are built during data preparation on every client that prepares the card, and
+  // the range origin they declare is read on whichever client rolled. A per-user
+  // preference would put a button on one screen and not another.
+  game.settings.register(MODULE_ID, SETTINGS.companionCommands, {
+    name: "EE.Settings.CompanionCommands.Name",
+    hint: "EE.Settings.CompanionCommands.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+    // Same reason as Reach: the buttons are added as documents are prepared, and
+    // nothing re-prepares an open sheet on its own.
+    onChange: () => reconcileCompanionCards(),
   });
 
   // World-scoped: only a GM can write actor documents, and the artwork this

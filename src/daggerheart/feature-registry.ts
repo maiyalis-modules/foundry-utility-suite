@@ -195,8 +195,13 @@ export function findGrantingItem(
  * Partial payment is never allowed: the system clamps a resource into range on
  * write, so a character with 5 of 6 Stress asked to mark 2 would silently mark
  * only 1 and still get the benefit.
+ *
+ * Exported for the same reason as {@link findGrantingItem}: a feature that owns
+ * its own interception point still has to withhold an offer nobody can pay for,
+ * and a second copy of the reversed-resource rule would be one more thing to
+ * keep in step with the system.
  */
-function canAfford(actor: AnyObject, costs: readonly FeatureCost[]): boolean {
+export function canAfford(actor: AnyObject, costs: readonly FeatureCost[]): boolean {
   for (const cost of costs) {
     const resource = actor["system"]?.resources?.[cost.key];
     if (!resource) return false;

@@ -9,13 +9,17 @@ import { releaseOwnHolds } from "./daggerheart/deck-holds.js";
 import { registerDeckLimitBrowser } from "./daggerheart/deck-limit-browser.js";
 import { registerDeckLimitGuard } from "./daggerheart/deck-limit-guard.js";
 import { registerDeckLimitWizard } from "./daggerheart/deck-limit-wizard.js";
+import { registerAdaptability } from "./daggerheart/adaptability.js";
 import { registerAdversaryAttack } from "./daggerheart/adversary-attack.js";
 import { registerBloodMaledict } from "./daggerheart/blood-maledict.js";
 import { registerBloodSpike } from "./daggerheart/blood-spike.js";
+import { registerCardTargeting } from "./daggerheart/card-targeting.js";
+import { registerCompanion } from "./daggerheart/companion.js";
 import { registerCrimsonRite } from "./daggerheart/crimson-rite.js";
 import { registerDualityOutcome } from "./daggerheart/duality-outcome.js";
 import { registerFearless } from "./daggerheart/fearless.js";
 import { registerFeatureAsk } from "./daggerheart/feature-ask.js";
+import { registerGiftedTracker } from "./daggerheart/gifted-tracker.js";
 import { registerHoldThemOff } from "./daggerheart/hold-them-off.js";
 import { registerISeeItComing } from "./daggerheart/i-see-it-coming.js";
 import { registerGmEffects } from "./daggerheart/gm-effects.js";
@@ -48,9 +52,13 @@ Hooks.once("init", async () => {
   registerDeckLimitGuard();
   registerDeckLimitBrowser();
   registerDeckLimitWizard();
-  // Patches the system's data preparation, so it has to be in place before any
-  // document is constructed — `init` is the last hook that guarantees that.
+  // Both patch the system's data preparation, so they have to be in place before
+  // any document is constructed — `init` is the last hook that guarantees that.
+  // Reach first, so the Companion card's patch wraps it and therefore runs last:
+  // the companion's attack reaches as far as the companion does, whatever the
+  // ranger's ancestry says about their own arms. See `CachedActions.ranges`.
   registerReach();
+  registerCompanion();
   // Feature automation: every window declares itself, then every feature
   // registers into one, and only then is the system's roll pipeline patched —
   // `installRollPipeline` runs the windows in registration order, so it has to
@@ -61,6 +69,13 @@ Hooks.once("init", async () => {
   // player has no permission to do themselves. Listener only — the senders are
   // features, and it does nothing on a client that isn't the writing GM.
   registerGmEffects();
+  // Before the duality window, and the order is deliberate: Adaptability may
+  // *replace* the roll outright, and Fearless asks whether to convert that
+  // roll's Fear into Hope. Rerolling first means the question is asked about the
+  // dice the player is keeping, rather than about a result that is discarded a
+  // moment later. (It also carries a chat-card control for rolls the system
+  // never scores, which takes no part in this ordering.)
+  registerAdaptability();
   registerDualityOutcome();
   registerAdversaryAttack();
   // Its own window rather than a registry feature — one card's rule, not a
@@ -71,6 +86,11 @@ Hooks.once("init", async () => {
   registerFearless();
   registerBloodMaledict();
   registerISeeItComing();
+  // A registry feature on the same window, plus a card of its own. Registered
+  // before the Ranger pair only because it is a domain card, like the two above
+  // it — nothing on this window depends on the order between them, since each
+  // re-decides the hit from whatever Evasion the last one left behind.
+  registerGiftedTracker();
   // Two Ranger features that fire on the same weapon attack, and the order
   // between them is deliberate: Ranger's Focus may *replace* the roll (its reroll)
   // and asks its first question before the dice are revealed, so it has to settle
@@ -86,6 +106,10 @@ Hooks.once("init", async () => {
   // standing ActiveEffect, so it hooks the system directly and takes no part in
   // the pipeline's ordering.
   registerCrimsonRite();
+  // The single wrapper behind every card that declares a target it must not ask
+  // for. After the features, so every rule they register is already listed —
+  // though the patch itself waits for `setup`, so the order is only tidiness.
+  registerCardTargeting();
   // Third-party integrations: each hooks nothing unless its module is active.
   registerVoidHybridForm();
   registerVoidHybridFormStressEnd();

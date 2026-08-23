@@ -92,8 +92,8 @@
  *   attacks are this one. Frequency beats fidelity here.
  * - **Targeting before the weapon.** Leaving the card's own `target.type` alone
  *   makes the button a targeted action, so the player picks someone with no range
- *   to filter by and is then asked again for the attack. See
- *   {@link patchCardTargeting} for why that has to be closed before any hook.
+ *   to filter by and is then asked again for the attack. The shared patch in
+ *   `card-targeting.ts` closes that before any hook can run.
  *
  * The one prompt that still fires off an ordinary attack is the reroll, and its
  * door is narrow by construction: the attack must have *failed*, against the
@@ -107,13 +107,14 @@ import { chooseOne, confirmChoice, type PromptParty } from "./feature-prompt.js"
 import { markActor, unmarkActor, type MarkRequest } from "./gm-effects.js";
 import { findGrantingItem, resourceUpdatesFor, type FeatureMatch } from "./feature-registry.js";
 import {
-  clearEarlyDice,
+  rebuildRoll,
   registerRollWindow,
   rollTypeOf,
   rollVisibility,
   showDiceEarly,
 } from "./roll-pipeline.js";
 import { attackActionOf, rollingCharacter, weaponOption } from "./attack-action.js";
+import { untargetAction } from "./card-targeting.js";
 
 /** Registry id, for the `flags.eryndor-essentials.featureId` escape hatch. */
 const FEATURE_ID = "rangersFocus";
@@ -419,72 +420,6 @@ async function setFocus(ranger: AnyObject, item: AnyObject, target: TargetEntry)
   void markActor(markRequestFor(ranger, target.actorId));
 }
 
-/**
- * Build a fresh roll of the same kind and evaluate it — the reroll.
- *
- * Rebuilding rather than re-rolling the dice in place, for the reason
- * `adversary-attack.ts` sets out: `config` **is** the roll's `options` (the
- * system's `createRollInstance` passes it straight through), and re-running
- * `buildEvaluate` is what makes `config.roll.total`, `config.roll.result.duality`
- * and every target's `hit` describe the new roll before anything reads them.
- * Nothing is rewritten by hand; the modifiers come back by recomputation from
- * `config.roll.baseModifiers` and the roll's active effects.
- *
- * The dice *appearance* is carried across by hand.
- * `DualityRoll.buildPost` stamps the Hope/Fear presets onto `roll.dice[0..2]`
- * before it calls `super.buildPost` — which is where this window runs — so the
- * replacement's dice have never been through that and would animate as plain
- * dice. Copying the options across is exactly what the system's own
- * `DualityRoll#reroll` does for the same reason.
- *
- * **One known edge.** `DualityRoll.buildPost` calls `handleTriggers(roll, …)`
- * *after* `super.buildPost` — using its own local `roll`, which is still the
- * original. So a registered `dualityRoll`/`fearRoll` trigger that inspects the
- * Roll object sees the discarded one. What it is *gated* on is fine, because that
- * is `config.roll.result.duality` and `buildEvaluate` has rewritten it, and so is
- * the chat card, the Hope/Fear update and every target's `hit`. Closing it
- * properly would mean patching `DualityRoll.buildPost` as well as `DHRoll`'s,
- * which is a second seam for a case no shipped trigger currently reads.
- *
- * Returns null if the system's shape has moved, in which case the pipeline posts
- * the original untouched.
- */
-async function rebuildRoll(
-  roll: AnyObject,
-  config: AnyObject,
-  message: AnyObject,
-): Promise<AnyObject | null> {
-  const rollClass = roll["constructor"] as AnyObject | undefined;
-  if (
-    typeof rollClass?.["createRollInstance"] !== "function" ||
-    typeof rollClass?.["buildEvaluate"] !== "function"
-  ) {
-    console.warn(`${LOG_PREFIX} ${LABEL}: cannot rebuild this roll — leaving it alone.`);
-    return null;
-  }
-
-  // The dice the table watched belong to the roll being discarded; the
-  // replacement's have never been seen and must animate normally. Cleared
-  // through `config`, which the old roll and the new one share as their options.
-  clearEarlyDice(config);
-
-  const rerolled = rollClass["createRollInstance"](config) as AnyObject;
-  await rollClass["buildEvaluate"](rerolled, config, message);
-
-  try {
-    const from = (roll["dice"] ?? []) as AnyObject[];
-    const to = (rerolled["dice"] ?? []) as AnyObject[];
-    for (let index = 0; index < to.length; index += 1) {
-      const options = from[index]?.["options"];
-      if (options && to[index]) to[index]!["options"] = options;
-    }
-  } catch (error) {
-    // Cosmetic only: without this the reroll animates in default colours.
-    console.warn(`${LOG_PREFIX} ${LABEL}: could not carry the dice presets over.`, error);
-  }
-
-  return rerolled;
-}
 
 /**
  * Settle an attack the card launched: the Focus is made, or the Hope was wasted.
@@ -564,7 +499,7 @@ async function offerReroll(
     }),
   );
 
-  return (await rebuildRoll(roll, config, message)) ?? undefined;
+  return (await rebuildRoll(roll, config, message, LABEL)) ?? undefined;
 }
 
 /**
@@ -776,69 +711,6 @@ async function chooseWeapon(weapons: EquippedAttack[]): Promise<EquippedAttack |
 }
 
 /**
- * Stop the *card* asking for a target of its own.
- *
- * The SRD action declares `target.type: "any"`, which is honest about what it
- * originally did (drop a marker on whoever you had targeted) and wrong about what
- * it does now. Left alone it makes both the system and the Target Helper's guard
- * treat the button press as a targeted action, so the player is asked to pick
- * someone *before* the weapon is known — with no range to filter by — and then
- * asked again for the attack. That is the wrong order and one prompt too many.
- *
- * ## Why a patch rather than a hook
- *
- * `config.hasTarget` is set inside `TargetField.prepareConfig`, which runs during
- * `prepareConfig` — **before** `daggerheart.preUseAction` fires. By the time any
- * listener of ours could clear it, the guard's listener may already have run and
- * opened its picker, and which of the two listeners goes first is decided by
- * module load order, which is not ours to control. Both modules register at
- * `init`. So the flag has to be gone before the hook exists at all.
- *
- * The blanking is scoped to one call and restored in a `finally`, so nothing is
- * written to the card and an action used any other way is untouched. Reading
- * `this.target.type` is also exactly what the guard checks second, so this closes
- * both of its doors.
- */
-function patchCardTargeting(): void {
-  const actionClass = game.system?.api?.models?.actions?.actionsTypes?.base as
-    | AnyObject
-    | undefined;
-  const original = actionClass?.["prototype"]?.["use"];
-
-  if (typeof original !== "function") {
-    console.warn(`${LOG_PREFIX} ${LABEL}: no action class to patch — the card will ask twice.`);
-    return;
-  }
-
-  actionClass!["prototype"]["use"] = async function (
-    this: AnyObject,
-    event?: unknown,
-    configOptions?: AnyObject,
-  ): Promise<unknown> {
-    const target = this["target"] as AnyObject | undefined;
-    if (!enabled() || !target || !focusCardAction(this)) {
-      return original.call(this, event, configOptions);
-    }
-
-    const declared = target["type"];
-    try {
-      target["type"] = "";
-    } catch (error) {
-      // A sealed data model would throw here. Losing the tidy ordering is much
-      // better than losing the button, so carry on with the action as declared.
-      console.warn(`${LOG_PREFIX} ${LABEL}: could not un-target the card's action.`, error);
-      return original.call(this, event, configOptions);
-    }
-
-    try {
-      return await original.call(this, event, configOptions);
-    } finally {
-      target["type"] = declared;
-    }
-  };
-}
-
-/**
  * "When you deal damage to them, they must mark a Stress."
  *
  * Wraps the system's `DamageField.applyDamage`, which is the one moment damage
@@ -981,9 +853,8 @@ export function registerRangersFocus(): void {
   registerFocusStress();
   registerFocusCard();
 
-  // Both reach into `game.system.api`, which the system only fills inside its own
-  // `init`, so neither can be done from ours. Setup is early enough for both: the
-  // action prototype is patched before any action is used, and `applyDamage` is
-  // bound lazily on first use.
-  Hooks.once("setup", patchCardTargeting);
+  // The card declares `target.type: "any"` from what it used to do — see
+  // `card-targeting.ts`, whose shared patch blanks it for the duration of one
+  // press so the target is chosen after the weapon, against the weapon's range.
+  untargetAction((action) => enabled() && focusCardAction(action) !== null);
 }

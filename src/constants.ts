@@ -119,6 +119,17 @@ export const SETTINGS = {
    */
   fearlessFearToHope: "fearlessFearToHope",
   /**
+   * Master switch for automating **Adaptability** (Human): put a "mark a Stress
+   * to reroll" control on the chat card of any roll that spent Hope on one of
+   * your own Experiences. See `daggerheart/adaptability.ts`.
+   *
+   * World-scoped and **on** by default, like the other card rules. The odd one
+   * out in *where* it appears — a button on the posted card rather than a prompt
+   * mid-roll — because the card's trigger is a failure the system frequently
+   * cannot score, the difficulty being the GM's to set.
+   */
+  adaptabilityReroll: "adaptabilityReroll",
+  /**
    * Master switch for automating **Blood Maledict** (Blood Hunter, *Void for
    * Daggerheart*): when an adversary lands an attack within Close range, offer
    * the character 3 Hope to make it reroll at disadvantage — before the chat card
@@ -194,6 +205,32 @@ export const SETTINGS = {
    * along with everything else.
    */
   rangersFocusTracking: "rangersFocusTracking",
+  /**
+   * Master switch for automating **Gifted Tracker** (Sage domain): the card's
+   * button asks what the character is following, puts that in front of the GM
+   * with a searchable picker of every actor in the install, records the answer on
+   * the ranger, and gives them +1 Evasion against those creatures — and only
+   * those — whenever one attacks them. See `daggerheart/gifted-tracker.ts`.
+   *
+   * World-scoped and **on** by default, like the rest. Note this one *replaces*
+   * the card's own ActiveEffect rather than sitting beside it: the SRD ships a
+   * flat, permanent `system.evasion +1` against the entire world, so switching
+   * this off restores that instead of restoring nothing.
+   */
+  giftedTrackerEvasion: "giftedTrackerEvasion",
+  /**
+   * Master switch for the Beastbound **Companion** card: it grows two buttons —
+   * the companion's attack, and a plain action roll — and both are made as the
+   * ranger's own Spellcast Roll, with the companion's Experiences on offer for a
+   * Hope each. The attack's range is still measured from the companion's token.
+   * See `daggerheart/companion.ts`.
+   *
+   * World-scoped and **on** by default, like the rest. This one *adds* to a card
+   * the system leaves passive rather than replacing anything, so switching it off
+   * returns the card to being description-only — the companion's own sheet keeps
+   * both of its buttons either way.
+   */
+  companionCommands: "companionCommands",
   /**
    * Repoint a portrait raised by Ginzzzu's Portraits & NPC Dock when the actor's
    * artwork changes underneath it — something that module doesn't do for `img`.
@@ -390,6 +427,25 @@ export const FLAGS = {
    * Purely a label: the authoritative record is always the ranger's own effect.
    */
   rangersFocusTarget: "rangersFocusTarget",
+  /**
+   * Marks an ActiveEffect as one **Gifted Tracker** tracking, and records what is
+   * being tracked: `{ description, hope, quarry: [{ uuid, name, img }] }`.
+   *
+   * The effect *is* the record rather than a label beside one kept elsewhere:
+   * deleting it from the sheet is how a ranger stops tracking, and two places to
+   * look would eventually disagree. It deliberately carries no `changes` — the
+   * +1 Evasion it stands for applies only against the listed creatures, which is
+   * not something an ActiveEffect can express, so it is applied per attack in the
+   * `adversaryAttack` window instead.
+   *
+   * Exactly one per ranger, like {@link FLAGS.rangersFocus}: using the card
+   * again replaces it, which is the only thing that ends a tracking
+   * automatically. Everything else the rule might mean by "until you stop
+   * tracking them" is the table's judgement and is settled by deleting the
+   * effect. The readers still handle finding several, so an effect built by hand
+   * — or one left by a delete that failed halfway — is read rather than ignored.
+   */
+  giftedTracker: "giftedTracker",
 } as const;
 
 /** Foundry template paths (served from the module root at runtime). */

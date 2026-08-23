@@ -236,6 +236,13 @@ function buildContext(
       if (config["roll"]) {
         config["roll"]["success"] = targets.some((target) => target["hit"] === true);
       }
+
+      // Kept live rather than left as the answer it was at build time. Every
+      // feature on this window gates on it, and the window applies its
+      // non-optional features *before* it prompts for the optional ones — so a
+      // stale `true` here is what would offer a player a Stress to dodge an
+      // attack that has already stopped landing on them.
+      this.isHitTarget = mine.some((target) => target["hit"] === true);
     },
 
     async payCost(costs: readonly FeatureCost[]): Promise<void> {
@@ -394,7 +401,14 @@ async function runAdversaryAttackWindow(
       await applyOffer(context, offer);
     }
 
-    const optional = offers.filter((entry) => entry.feature.optional);
+    // Asked again rather than reused from `offers` above. A non-optional feature
+    // — Gifted Tracker's +1 Evasion is the first — may just have changed the very
+    // thing the optional ones were judged against, and offering a player a price
+    // to alter an attack that no longer lands is worse than offering nothing.
+    // Cheap: the registry is a handful of entries and `when` is a predicate.
+    const optional = offersFor("adversaryAttack", context).filter(
+      (entry) => entry.feature.optional,
+    );
     if (optional.length > 0) {
       // Once, before the first prompt of this roll: the player has to see the
       // attack land before being asked to spend anything on changing it.

@@ -180,6 +180,15 @@ declare global {
     i18n: {
       localize(key: string): string;
       format(key: string, data?: AnyObject): string;
+      /**
+       * Core's cached `Intl.ListFormat` for the active language — the right way
+       * to join a list into a sentence, since "a, b and c" is not punctuated the
+       * same way in every language.
+       */
+      getListFormatter(options?: {
+        style?: "long" | "short" | "narrow";
+        type?: "conjunction" | "disjunction" | "unit";
+      }): { format(list: string[]): string };
     };
   } & AnyObject;
 
@@ -190,6 +199,13 @@ declare global {
    * instead of a throw for a UUID that can only be resolved asynchronously.
    */
   function fromUuidSync(uuid: string, options?: AnyObject): AnyObject | null;
+
+  /**
+   * Asynchronous UUID resolution. The one to reach for when the document may
+   * live in a compendium that has not been loaded, where `fromUuidSync` returns
+   * an index entry with no system data on it.
+   */
+  function fromUuid(uuid: string, options?: AnyObject): Promise<AnyObject | null>;
 
   /**
    * Foundry's dice roller.

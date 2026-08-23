@@ -611,3 +611,79 @@ async function chooseRow(request: OneOfRequest): Promise<string | null> {
 
   return picked;
 }
+
+/** Everything needed to raise an {@link askText} prompt. */
+export interface TextRequest {
+  title: string;
+  /** The question as a sentence. */
+  intro: string;
+  /** Localized ghost text in the empty field — an example, not an instruction. */
+  placeholder?: string;
+  /** Localized confirm button. */
+  confirmLabel: string;
+  /** Localized cancel button. */
+  cancelLabel: string;
+  /**
+   * Hard cap on what comes back, in characters.
+   *
+   * Not a UI nicety: this text is written by one player, sent over the socket and
+   * rendered on the GM's screen, so its length is somebody else's problem unless
+   * something bounds it here.
+   */
+  maxLength: number;
+}
+
+/**
+ * Ask for a line of prose. Returns the trimmed text, or null when the player
+ * cancelled, dismissed the dialog, or submitted nothing.
+ *
+ * Empty is deliberately null rather than `""`: every caller has to handle "they
+ * backed out" anyway, and a blank answer means the same thing — there is nothing
+ * to act on — so collapsing the two removes a case rather than hiding one.
+ *
+ * No timeout, for the same reason as {@link chooseOne}: this is raised after an
+ * action has resolved, so nothing is being held back while the player types.
+ */
+export async function askText(request: TextRequest): Promise<string | null> {
+  const { title, intro, placeholder, confirmLabel, cancelLabel, maxLength } = request;
+
+  const { DialogV2 } = foundry.applications.api;
+
+  const answer = await DialogV2.wait({
+    classes: ["ee-feature-prompt"],
+    window: { title },
+    content: `<p>${escapeHtml(intro)}</p>
+      <textarea class="ee-feature-text" name="text" rows="3" maxlength="${maxLength}"
+        placeholder="${escapeHtml(placeholder ?? "")}"></textarea>`,
+    buttons: [
+      {
+        action: "confirm",
+        label: confirmLabel,
+        default: true,
+        callback: (_event: Event, button: AnyObject) => ({
+          text: String(button?.["form"]?.elements?.["text"]?.value ?? ""),
+        }),
+      },
+      { action: "cancel", label: cancelLabel },
+    ],
+    rejectClose: false,
+    render: (_event: Event, instance: AnyObject) => {
+      try {
+        const root = instance?.["element"] as HTMLElement | undefined;
+        // Focused on open: this dialog exists only to be typed into, and a player
+        // who has just pressed a card button should not have to click again.
+        root?.querySelector<HTMLTextAreaElement>(".ee-feature-text")?.focus();
+      } catch (error) {
+        console.warn(`${LOG_PREFIX} Feature prompt: could not focus the field.`, error);
+      }
+    },
+  }).catch(() => null);
+
+  // Re-capped here as well as in the markup: `maxlength` is one client's DOM, and
+  // this is the value everything downstream acts on.
+  const text = String((answer as AnyObject | null)?.["text"] ?? "")
+    .slice(0, maxLength)
+    .trim();
+
+  return text.length > 0 ? text : null;
+}

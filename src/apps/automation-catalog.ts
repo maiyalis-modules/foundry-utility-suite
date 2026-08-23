@@ -96,7 +96,22 @@ const ANCESTRIES: Catalog = {
     plain("Giant"),
     plain("Goblin"),
     plain("Halfling"),
-    plain("Human"),
+    {
+      id: "human",
+      label: "Human",
+      groups: [
+        {
+          legend: "EE.Automation.FeaturesLegend",
+          settings: [
+            {
+              key: SETTINGS.adaptabilityReroll,
+              name: "EE.Settings.AdaptabilityReroll.Name",
+              hint: "EE.Settings.AdaptabilityReroll.Hint",
+            },
+          ],
+        },
+      ],
+    },
     {
       id: "infernis",
       label: "Infernis",
@@ -175,6 +190,19 @@ const CLASSES: Catalog = {
               key: SETTINGS.rangersFocusTracking,
               name: "EE.Settings.RangersFocusTracking.Name",
               hint: "EE.Settings.RangersFocusTracking.Hint",
+            },
+          ],
+        },
+        {
+          // Companion is the Beastbound subclass's foundation feature. Same
+          // filing rule as Hybrid Form under Blood Hunter: a subclass has
+          // nowhere of its own here, and its parent class is unambiguous.
+          legend: "EE.Automation.BeastboundLegend",
+          settings: [
+            {
+              key: SETTINGS.companionCommands,
+              name: "EE.Settings.CompanionCommands.Name",
+              hint: "EE.Settings.CompanionCommands.Hint",
             },
           ],
         },
@@ -264,7 +292,22 @@ const DOMAINS: Catalog = {
     plain("Codex"),
     plain("Grace"),
     plain("Midnight"),
-    plain("Sage"),
+    {
+      id: "sage",
+      label: "Sage",
+      groups: [
+        {
+          legend: "EE.Automation.DomainCardsLegend",
+          settings: [
+            {
+              key: SETTINGS.giftedTrackerEvasion,
+              name: "EE.Settings.GiftedTrackerEvasion.Name",
+              hint: "EE.Settings.GiftedTrackerEvasion.Hint",
+            },
+          ],
+        },
+      ],
+    },
     plain("Splendor"),
     plain("Valor"),
     {

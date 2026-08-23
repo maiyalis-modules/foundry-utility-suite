@@ -183,14 +183,21 @@ loads).
   setting `voidHybridFormStressRevert`, **on by default** (unlike the portrait
   settings above) — this isn't optional artwork, it's a rule Void already half-
   implements; leaving it off leaves that half-implementation in place.
-- **Range survey hookup** (`src/integrations/target-helper-survey.ts`) — *optional*
-  integration with the sibling module **Maiyalis: Target Helper**
-  (`daggerheart-target-helper`), whose `game.modules.get(…).api.openRangeSurvey`
-  opens a read-only window listing everything on the scene with its distance from
-  a given token. The only caller is the Tokens on Scene bar above. Gated twice:
-  `surveysAvailable()` decides whether the button is drawn at all, and
-  `openRangeSurvey` re-checks on click, since a GM can disable a module in
-  another tab between the two.
+- **Target Helper hookup** (`src/integrations/target-helper-survey.ts`) — the one
+  place here that talks to the sibling module **Maiyalis: Target Helper**
+  (`daggerheart-target-helper`) through `game.modules.get(…).api`. *Optional*
+  like every integration in that folder, and each entry point is probed
+  separately (`typeof api?.x === "function"`) so an older install that publishes
+  only some of them still gets those.
+  - `openRangeSurvey` opens a read-only window listing everything on the scene
+    with its distance from a given token. Its only caller is the Tokens on Scene
+    bar above, and it is gated twice: `surveysAvailable()` decides whether the
+    button is drawn at all, and `openRangeSurvey` re-checks on click, since a GM
+    can disable a module in another tab between the two.
+  - `registerRangeOrigin` declares where an action's range is measured *from*,
+    for the case where the creature acting is not the creature rolling. Its only
+    caller is the Companion feature. A `false` return is not worth a
+    notification: without that module nothing gates range for anybody.
 - **Raised-portrait refresh** (`src/integrations/ginzzzu-portraits.ts`) — *optional*
   integration with **Ginzzzu's Portraits & NPC Dock** (`ginzzzu-portraits`). Its
   own `updateActor` handler live-swaps a raised portrait's image, but only for six
@@ -285,6 +292,10 @@ loads).
     `CONFIG.Item.documentClass` at script load (before any `init` hook) and no
     document is constructed until `setup`, so the patch is in place for the first
     preparation and there is nothing to catch up on at load.
+  - It shares `Item#prepareEmbeddedDocuments` with the **Companion** feature, and
+    `registerReach()` is called *first* so that patch wraps this one and runs
+    last. Otherwise a Giant Beastbound's companion would get its Melee bite
+    promoted to Very Close because the *partner* has long arms.
   - The adjustment is **idempotent in both directions**, and has to be:
     `Actor#prepareData` calls `Item#prepareData`, which does *not* re-initialize
     `system` from source, so a one-way write would stick forever. The undo is
@@ -493,6 +504,104 @@ loads).
     calls `actor.modifyResource(...)` directly and **awaits** it, which is why
     `payCost` returns `void | Promise<void>` and `applyOffer` is async: a failed
     write aborts the window before the outcome changes, rather than after.
+- **Adaptability** (`src/daggerheart/adaptability.ts`) — the Human ancestry's
+  (SRD p.30) "When you fail a roll that utilized one of your Experiences, you can
+  mark a Stress to reroll." `Compendium.daggerheart.ancestries.Item.BNofV1UC4ZbdFTkb`,
+  a `feature` Item whose one action ("Mark Stress") charges the Stress and does
+  nothing else. World setting `adaptabilityReroll`, **on** by default, under
+  **Ancestries → Human**. **Two delivery mechanisms that partition one rule** —
+  read this before automating another "when you fail…" card, because choosing
+  between the shapes is the whole design.
+  - **The prompt is primary; the card button covers what it cannot.**
+    `D20Roll.buildEvaluate` fills in `config.roll.success` only when the roll had
+    targets or a difficulty typed into the dialog; anything else leaves it
+    `undefined`, because the GM sets the difficulty and routinely says so only
+    after the dice are read out. So: a **scored failure** (`success === false`)
+    gets the ordinary roll-window prompt, like every other feature here — dice
+    shown, one question, settled before the chat card posts. An **unscored** roll
+    gets a control on the posted card instead, because no honest prompt can be
+    raised for a roll nobody has adjudicated, and asking anyway would put a modal
+    in front of the player on every Experience roll before they knew whether it
+    failed. **This matters at tables that play with chat hidden** — the prompt is
+    the mechanism they see, and it is why the card button alone was not enough.
+    The two **overlap on purpose**: a scored failure raises the prompt *and*
+    leaves the button, because the rule is retroactive ("when you fail a roll …
+    you can") and a player who let the prompt go and then heard the GM narrate
+    the miss should still be able to spend the Stress. Only a scored *success*
+    withdraws the button.
+  - **The two paths reroll differently and must.** From the posted card,
+    `DualityRoll#reroll({liveRoll: true})` is right: the first result already
+    handed out its Hope or Fear, and that call reconciles it through the system's
+    own automation settings and Fear countdowns
+    (`updateResourcesForDualityReroll`). From the prompt, at the pipeline seam,
+    `dualityUpdate` has not run yet — nothing to reconcile, and that call would
+    double-count — so the reroll is `rebuildRoll`, the same choice
+    `rangers-focus.ts` makes. Getting this backwards is silent and costs the
+    table a Hope or a Fear.
+  - **`rebuildRoll` now lives in `roll-pipeline.ts`**, moved out of
+    `rangers-focus.ts` when this became its second caller — the usual rule here,
+    and it belongs beside `clearEarlyDice`, which it calls. It takes a `label`
+    only to name the caller in its warnings.
+  - **Registered before `registerDualityOutcome()`.** Both can fire on one roll,
+    and this one may *replace* it: rerolling first means Fearless asks about
+    converting the Fear on the dice the player is keeping, not on a result
+    discarded a moment later.
+  - **The trigger is `roll.options.experiences`**, an array of keys the roll
+    dialog writes, cross-checked against `roll.options.data.experiences` — the
+    same pairing `configureModifiers` filters on before it will add anything to
+    the total. Both survive into the chat message, because `config` **is** the
+    roll's `options`, so a card from last session still answers. A
+    `roll.companionRoll` is excluded: those spend Hope on the *companion's*
+    Experiences, and the card says one of **your** Experiences.
+  - **`DualityRoll#reroll({liveRoll: true})` does the work**, and using it rather
+    than rebuilding is deliberate — the opposite call from `rangers-focus.ts`, for
+    the opposite reason. There the seam is *before* the Hope/Fear update, so
+    `liveRoll` would reconcile something that had not happened yet. Here the first
+    result has already given out its Hope or Fear, so the reconciliation
+    (`updateResourcesForDualityReroll`, which also honours the world's `hopeFear`
+    automation settings and the Fear countdowns) is exactly what is wanted, and
+    reimplementing it would be copying policy. `Roll#reroll` clones from
+    `this._formula`, by then fully resolved — every modifier including the
+    Experience is already a number in the string, so the reroll keeps them all and
+    nothing is charged twice.
+  - **`refreshSnapshot` exists because the system's own reroll leaves the record
+    stale.** `config.roll` is a plain-object snapshot written by the three
+    `buildEvaluate` overrides and persisted with the message; the chat log's
+    "Reroll Action" context entry replaces `message.rolls[0]` and updates none of
+    it. Most of the card renders from the live Roll object, but the difficulty
+    badge reads `roll.options.roll.success` for its "miss" styling and a
+    result-based damage part reads `roll.options.roll.result.duality`. Mirrors
+    `buildEvaluate` (Daggerheart **2.7.2**) rather than inventing a second set of
+    rules, and deliberately skips `extra`, which derives from `roll.baseTerms` —
+    only `configureModifiers` fills that in, and a cloned roll never runs it, so
+    computing it here would report every die as an extra one.
+  - **Target hits need nothing**, which is what makes swapping the roll enough:
+    `DhRollMessage#_getCurrentTargets` recomputes `hitResult` from `this.roll` on
+    every render. Same fact `i-see-it-coming.ts` relies on from the other
+    direction — it is why a flipped `hit` flag there would be cosmetic.
+  - **`message.system.successConsumed` is deliberately not touched.** It reads
+    like "the roll succeeded" and is not: it marks that a `consumeOnSuccess`
+    action's deferred cost has already been charged.
+  - Offered only to a client that could actually carry it out — the actor's owner,
+    *and* whoever the system would let rewrite the message (`isAuthor` or GM).
+    Both paths also stand down on a critical, which is a success in Daggerheart
+    whatever the difficulty was.
+  - **Every gate logs at `console.debug` when it declines**, and the first build
+    shipped without that — which cost a debugging round trip when the feature
+    appeared to do nothing, exactly the lesson Hold Them Off already recorded.
+    Detection is an `instanceof CONFIG.Dice.daggerheart.DualityRoll` over
+    `message.rolls` rather than a `message.type` string plus the system's
+    `message.system.roll` getter, and the card button anchors to the first of
+    `.roll-buttons` / `.chat-roll` / last child that exists — so a template
+    reshuffle can misplace it but never lose it.
+  - **No use limit**, because the card prints none: a reroll that fails again may
+    be rerolled for another Stress. Each announces itself in chat, whispered to
+    whoever the original roll reached, so a table reading the rule more strictly
+    can see it happen. Every gate is re-read on click as well as on render, so a
+    card left in the log overnight can't pay a price that is no longer there.
+  - `feature-registry.ts`'s `canAfford` is now exported alongside
+    `findGrantingItem`, for the same reason: a feature with its own interception
+    still has to withhold an offer nobody can pay for.
 - **Fearless** (`src/daggerheart/fearless.ts`) — the Infernis ancestry's "When you
   roll with Fear, you can mark 2 Stress to change it into a roll with Hope
   instead." The SRD ships it as a `feature` Item whose single action only charges
@@ -845,7 +954,9 @@ loads).
     Known edge, documented in the file: `handleTriggers` afterwards is handed
     `DualityRoll.buildPost`'s own local `roll`, still the original — what triggers
     are *gated* on (`config.roll.result.duality`) is correct, but a trigger that
-    inspects the Roll object sees the discarded one.
+    inspects the Roll object sees the discarded one. **This lives in
+    `roll-pipeline.ts` as `rebuildRoll(roll, config, message, label)`**, moved
+    there when Adaptability became its second caller.
   - **"You know precisely what direction they are in" is deliberately not
     automated.** It grants no number; the honest implementation is the GM
     answering, and the effect's description carries the wording so it is on the
@@ -883,8 +994,9 @@ loads).
       because a DialogV2 button takes a plain label and these need structure. So
       the answer can't be the dialog's own result: a click records the choice and
       closes, and the recorded value is returned. One delegated listener reading
-      `data-ee-choice` via `closest()` — the click routinely lands on the
-      artwork, not the button.
+      `data-ee-choice` via `closest()` — one listener rather than one per row.
+      (Core sets `button > * { pointer-events: none }`, so the click target is
+      already the row; `closest()` costs nothing and doesn't depend on that.)
     - `attack-action.ts`'s `weaponOption(id, weapon)` builds the row for both
       callers; `id` is the caller's, because Crimson Rite answers in slots and
       Ranger's Focus in Item ids. The damage figure is
@@ -895,6 +1007,201 @@ loads).
     own words. Not `chooseOffers`'s single-offer branch, which looks identical and
     is asking a different question ("do you want to use this feature you hold",
     with the shared button strings and the card named in the body).
+- **Gifted Tracker** (`src/daggerheart/gifted-tracker.ts`) — the Sage domain's
+  (SRD) "spend any number of Hope and ask the GM that many questions … when you
+  encounter creatures you've tracked in this way, gain a +1 bonus to your Evasion
+  against them". `Compendium.daggerheart.domains.Item.VZ2b4zfRzV73XTuT`, a
+  `domainCard` whose one `effect` action carries a **scalable** Hope cost
+  (`scalable: true, value: 1, step: 1`) and an ActiveEffect. World setting
+  `giftedTrackerEvasion`, **on** by default, under **Domains → Sage**. Registered
+  on the `adversaryAttack` window as a **registry feature**, plus a card takeover
+  of its own.
+  - **What the SRD ships is wrong twice, and this replaces it rather than
+    extending it.** Its effect is a flat `system.changes: [{ key:
+    "system.evasion", type: "add", value: "+1" }]` applied through `EffectsField`
+    to whoever is **targeted** — so using the card means selecting somebody (the
+    only sensible choice being yourself), and what you get is a *permanent,
+    unconditional* +1 Evasion against the whole world. Press it twice for +2
+    forever. Turning the setting off restores that, not "nothing".
+    - **"+1 against these particular creatures" cannot be an ActiveEffect.** It
+      isn't a property of the character; it's a property of one attack. That is
+      the whole reason this feature exists in the roll window at all, and why the
+      recorded effect deliberately carries **no `changes`**. Don't "simplify" it
+      back into a change.
+    - Suppressed with `config.hasEffect = false` in `preUseAction`, exactly as
+      Ranger's Focus does. Blanking the card's target would *also* stop it
+      (`applyEffects` returns with no targets), but relying on that would make a
+      display decision load-bearing for a mechanical one.
+  - **Flow: press → Hope → describe → GM names it → recorded.** The Hope prompt
+    is the system's own scalable cost dialog, untouched; `postUseAction` reads
+    the answer back off `config.costs` (`CostField.calcCosts` writes `total =
+    value + scale * step`), because that number is *also* how many questions the
+    rule buys. Then the **player** describes the signs in free text — not the
+    GM's job, and naming the creature here would answer the very questions the
+    Hope paid for.
+  - **The GM round-trip is one-way**, like `gm-effects.ts` and for the same
+    reason: the GM's client already owns a player's actor, so having it write the
+    record itself avoids a second socket hop and a reply the player's client
+    would have to re-validate. No GM connected means nothing happens — the right
+    answer for a card whose whole text is "ask the GM". Payload is descriptive
+    only, validated on arrival, and the player's free text is escaped everywhere
+    it renders (it lands on someone else's screen).
+  - **`actor-picker.ts` searches the compendiums; it does not list them.** The
+    SRD adversary pack alone is a few hundred entries before any third-party
+    content, so an empty box shows only what's on this scene and in the world —
+    small enough to render honestly — and typing (≥2 chars) reaches into every
+    Actor pack, capped at 40 results with the overflow counted. **Selection lives
+    in a `Map`, not in the DOM**, because filtering destroys rows: reading the
+    answer off the form at submit would silently drop everything picked before
+    the last search. Picked entries render as chips above the results, which
+    doubles as the running total.
+  - **Identity is a *set* of keys, not one uuid.** What the GM points at and what
+    later attacks you are rarely the same document — the GM picks a compendium
+    statblock, an unlinked token walks on carrying an ActorDelta whose uuid names
+    a scene and whose name is "Minor Treant (2)". So `identityKeys` collects
+    uuid, `_stats.compendiumSource` and name for **both** the attacking actor and
+    the world actor behind it, and any one match counts. Same
+    flag-then-compendium-then-name philosophy as `FeatureMatch`, name last for
+    the same reason: it's the only thing that catches a hand-typed statblock and
+    the only one that can over-match.
+  - **The effect *is* the record** (`flags.eryndor-essentials.giftedTracker`),
+    not a label beside a flag kept elsewhere — deleting it from the sheet is the
+    "or you stop tracking them" the card never spells out, and two places to look
+    would drift. One per ranger, like `rangersFocus`.
+  - **Ending it is deliberately only half automated.** The card never says what
+    ends a tracking, and losing the trail / giving up / the creature dying are
+    table judgements with no honest event behind them — hanging it on a rest, a
+    scene change or a distance would be inventing a rule. So the effect is left to
+    be deleted by hand. The **one** moment the system can be certain is a ranger
+    starting on fresh tracks, so pressing the card again replaces the previous
+    tracking (`endTracking`) and the chat line names what was dropped, since
+    silently losing an Evasion bonus you were counting on is the worst version of
+    this. Replacement happens **only when a new tracking is actually recorded** —
+    a GM cancelling the picker must not destroy what the ranger was already
+    following. Readers still handle finding several, so a hand-built effect or one
+    left by a half-failed delete is read rather than ignored.
+  - The chat record is **whispered to the GM and the ranger's owners**, not the
+    table: the quarry is a list of statblock names the GM has just chosen, which
+    is a straight spoiler for anyone who hasn't met them — while the ranger has
+    legitimately just been told the answers.
+  - The Evasion bonus announces itself **only when it changed the outcome**. A
+    tracked creature hitting for 18 against Evasion 12 would still have hit at
+    13, and a message on every swing would bury the one that matters. Same
+    judgement `evasionDecides` makes: don't spend the table's attention on a
+    change that changed nothing.
+  - **This is the first non-optional feature on the `adversaryAttack` window, and
+    it exposed a latent ordering bug there.** The window applies non-optional
+    features *before* prompting for optional ones, but `offersFor` had been
+    called once, up front — so a +1 that turned the only hit into a miss would
+    still offer I See It Coming's "mark a Stress for a d4" against an attack that
+    no longer landed. Fixed in `adversary-attack.ts`: `raiseEvasion` now keeps
+    `context.isHitTarget` live (it already re-decided `target.hit`), and the
+    optional offers are re-asked after the non-optional pass. Keep both if you
+    touch that loop.
+  - **Known gap, by choice:** the bonus rides the `adversaryAttack` window, which
+    handles the plain `D20Roll` an adversary makes. A tracked creature built on a
+    `character` sheet rolls Duality and that window never sees it, so tracking
+    another party's PC records the quarry but applies no +1. Reimplementing
+    `raiseEvasion`'s difficulty precedence and hit/success recomputation for
+    duality rolls to close it would be two copies of subtle logic; adversaries
+    are what anyone tracks.
+  - `feature-prompt.ts` grew **`askText`** for the description — a textarea with
+    a hard `maxLength` that is re-applied to the returned value, since `maxlength`
+    is one client's DOM and this text crosses a socket. Empty comes back as
+    `null`, the same as cancelling: every caller has to handle "they backed out"
+    anyway, and a blank answer means the same thing.
+- **Companion** (`src/daggerheart/companion.ts`) — the Beastbound subclass's
+  foundation card, made pressable. World setting `companionCommands`, **on** by
+  default, filed under Ranger with its own `BeastboundLegend` group (same rule as
+  Hybrid Form under Blood Hunter: a subclass has nowhere of its own).
+  - **What the system leaves broken.** The Companion card is
+    `featureForm: "passive"` with `actions: {}` — clicking it posts prose. The
+    rule that matters ("Make a Spellcast Roll to connect with your companion and
+    command them to take action") lives on the *companion's* sheet, split across
+    two buttons each holding half of it: the companion sheet's action roll does
+    it correctly (`partner.diceRoll`, spellcast trait, `companionRoll: true`, so
+    the ranger rolls and the dialog offers the companion's Experiences at a Hope
+    each) but points at nothing; the companion's **attack** is rolled *by the
+    companion* — `rollClass` returns `DualityRoll` for `companion` too — with the
+    partner's spellcast modifier pasted on as a flat "Bonus to Hit". The number
+    matches; nothing else does. Hope and Fear land on an actor with no Hope
+    resource and none of the ranger's roll bonuses apply.
+  - **The ranger rolls; the companion reaches.** Two actions are built on the
+    *ranger*, parented to the Companion feature Item. `roll.type: "spellcast"`
+    makes `DHActionRollData#rollTrait` return `spellcastModifierTrait.key`, so it
+    is genuinely a Spellcast Roll; `action.actor` is the ranger, so
+    `resourceUpdates`, Hope/Fear and every `system.bonuses.roll.*` are hers.
+    `DualityRoll#applyBaseBonus` adds both `roll.spellcast` and (because the
+    attack has damage) `roll.attack` bonuses — verified, that is the "any bonuses
+    the character would get" half of the ask.
+  - **Range is the one thing that decision costs**, and it is paid across the
+    repo boundary: `daggerheart-target-helper` measures from `action.actor`'s
+    token, so this file is the first caller of its new
+    `api.registerRangeOrigin` (routed through
+    `integrations/target-helper-survey.ts`, which is still the only place here
+    that talks to that module). Only the *distance* moves — grouping and the
+    disposition filter stay with the ranger. Without that module nothing gates
+    range for anybody, so the fallback is the system's own behaviour.
+  - **Injected into `item.system.actions`, not `actionsList`.** Not cosmetics:
+    the system resolves an action back from `config.source.action` through
+    `item.system.actionsList` in two places that both matter — `D20RollDialog`'s
+    constructor and the chat message's `actionItem` (how a damage button finds
+    what it is rolling for). Being in the collection also gets `usable`,
+    `Item#use`'s native `ActionSelectionDialog`, the per-action buttons the
+    `inventory-item-V2.hbs` partial already renders, and `fromUuid` resolution
+    via `getEmbeddedDocument("Action", …)` — all for free. The `_id`s are fixed
+    (`eeCompanionAtk01`, `eeCompanionCmd01`, sixteen alphanumeric characters
+    because that is what `DocumentIdField` accepts) so a chat card from last
+    session still resolves.
+  - **Same seam as Reach** (`Item#prepareEmbeddedDocuments`), same reasoning:
+    nothing is written to the database, so the rule un-applies itself — switch
+    the setting off or unbind the companion and the next preparation deletes both
+    actions. `reconcileCompanionCards` exists for the setting changing
+    mid-session, exactly like `reconcileReach`.
+  - **`registerCompanion()` goes after `registerReach()` in `module.ts`,** so our
+    patch wraps theirs and runs last. Both touch the same method, and Reach
+    rewrites the derived range of every action the actor can use — which would
+    otherwise promote a Giant ranger's companion's Melee bite to Very Close
+    because the *partner* has long arms. The cached ranges are re-asserted on
+    every pass so the answer doesn't depend on how many times the item happened
+    to be prepared.
+  - **The Command roll is an `attack` action with no damage and no target**,
+    which is not a fudge: `hasDamage` tests `damage.main`, and
+    `TargetField#prepareConfig` returns early on a null `target.type` without
+    setting `hasTarget`. There is no bare "roll" action type, and this keeps both
+    options on one well-trodden workflow. Its `null`-free fallbacks matter —
+    `range` is a blank-allowing StringField and `target`/`damage` are
+    non-nullable SchemaFields.
+  - **`companionRoll` is set on `preUseAction`, not baked into the action.**
+    `RollField#prepareConfig` replaces `config.roll` wholesale, so anything
+    written earlier is gone; that hook is the first and only moment. It is the
+    entire Experience half of the rule — the dialog reads `config.data.companion`
+    (the ranger's roll data resolves it through `ForeignDocumentUUIDField`, which
+    initializes to a lazy getter, so world-load order is not a problem) and adds
+    a 1 Hope cost per Experience, charged to the ranger because she is the acting
+    actor. `CostField.order` is 150 against `RollField`'s 10, so a cost the
+    dialog added is still applied.
+  - **Deliberately not automated:** "on a success with Hope, if your next action
+    builds on their success, you gain advantage". The condition is a judgement
+    about the *next* action. A success with Hope posts a public note and stops
+    there. `roll.success` is left `undefined` by `buildEvaluate` when there is
+    neither a target nor a difficulty — the Command roll's normal case — so only
+    an explicit `false` stands the note down.
+- **Card targeting** (`src/daggerheart/card-targeting.ts`) — the single wrapper
+  around `DHBaseAction#use` behind every card that declares a target it must not
+  ask for. Features register a predicate with `untargetAction(rule)`; the patch
+  blanks `this.target.type` for the duration of one call and restores it in a
+  `finally`. Extracted from Ranger's Focus when Gifted Tracker became the second
+  consumer — two independent wrappers around the same method would nest in load
+  order, warn separately when the system moves, and leave nowhere that answers
+  "what un-targets a card". **Why a patch and not a hook** is unchanged and still
+  the important part: `config.hasTarget` is set in `TargetField.prepareConfig`,
+  which runs *before* `daggerheart.preUseAction` fires, and whether our listener
+  or `daggerheart-target-helper`'s guard goes first is module load order (both
+  register at `init`) — so the declaration has to be gone before the hook exists.
+  Installed from `module.ts` at **setup** (`game.system.api` is only filled in the
+  system's own `init`); rules are registered by features during `init`, so order
+  between them doesn't matter.
 - **Deck Limit** (`src/daggerheart/deck-limit.ts`, settings only so far) — models
   the table's card pool as physical decks: a card in one character's hands isn't
   available to anyone else. World settings `deckLimitEnabled` (off by default)
@@ -1120,10 +1427,14 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
   - **A switch for an automated feature goes in the catalog, not a template.**
     The Daggerheart Automation window has a "General" tab plus one tab per kind of
     character content — Ancestries, Communities, Classes, Domains — and a rule is
-    filed under the card that prints it (Fearless under Infernis; Blood Maledict,
-    Crimson Rite and Hybrid Form under Blood Hunter; Hold Them Off and Ranger's
-    Focus under Ranger;
-    Blood Spike under the Blood domain, I See It Coming under Bone). All four
+    filed under the card that prints it (Fearless under Infernis, Adaptability
+    under Human; Blood Maledict,
+    Crimson Rite and Hybrid Form under Blood Hunter; Hold Them Off, Ranger's
+    Focus and Companion under Ranger;
+    Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
+    Tracker under Sage). A subclass has no home of its own, so its rules are
+    filed under its parent class in a group of their own — Hybrid Form under
+    Blood Hunter, Beastbound under Ranger. All four
     content tabs render
     the *same* template from data in `src/apps/automation-catalog.ts`, so adding a
     switch is one `CatalogSetting` in the right entry's `groups`. `settingKeys` is

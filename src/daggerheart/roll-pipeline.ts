@@ -225,6 +225,87 @@ export function clearEarlyDice(config: AnyObject): void {
 }
 
 /**
+ * Build a fresh roll of the same kind and evaluate it — the reroll a window
+ * returns to replace the one the rest of `buildPost` would have posted.
+ *
+ * Rebuilding rather than re-rolling the dice in place, for the reason
+ * `adversary-attack.ts` sets out: `config` **is** the roll's `options` (the
+ * system's `createRollInstance` passes it straight through), and re-running
+ * `buildEvaluate` is what makes `config.roll.total`, `config.roll.result.duality`
+ * and every target's `hit` describe the new roll before anything reads them.
+ * Nothing is rewritten by hand; the modifiers come back by recomputation from
+ * `config.roll.baseModifiers` and the roll's active effects — which is also why
+ * a bonus the player paid for, an Experience among them, survives the reroll.
+ *
+ * **Deliberately not `DualityRoll#reroll({liveRoll: true})`.** That path also
+ * runs `updateResourcesForDualityReroll`, which reconciles the Hope or Fear the
+ * first result handed out — correct only *after* `dualityUpdate` has applied it,
+ * and at this seam it has not. A reroll acting on an already-posted message is
+ * the opposite case and does want it; see `adaptability.ts`.
+ *
+ * The dice *appearance* is carried across by hand. `DualityRoll.buildPost`
+ * stamps the Hope/Fear presets onto `roll.dice[0..2]` before it calls
+ * `super.buildPost` — which is where windows run — so the replacement's dice
+ * have never been through that and would animate as plain dice. Copying the
+ * options across is exactly what the system's own `DualityRoll#reroll` does for
+ * the same reason.
+ *
+ * **One known edge.** `DualityRoll.buildPost` calls `handleTriggers(roll, …)`
+ * *after* `super.buildPost` — using its own local `roll`, which is still the
+ * original. So a registered `dualityRoll`/`fearRoll` trigger that inspects the
+ * Roll object sees the discarded one. What it is *gated* on is fine, because that
+ * is `config.roll.result.duality` and `buildEvaluate` has rewritten it, and so is
+ * the chat card, the Hope/Fear update and every target's `hit`. Closing it
+ * properly would mean patching `DualityRoll.buildPost` as well as `DHRoll`'s,
+ * which is a second seam for a case no shipped trigger currently reads.
+ *
+ * Lives here rather than in the one feature that first needed it: it is the
+ * counterpart of {@link clearEarlyDice}, which it has to call, and there are now
+ * two callers (Ranger's Focus and Adaptability). `label` only names the caller in
+ * the warnings.
+ *
+ * Returns null if the system's shape has moved, in which case the pipeline posts
+ * the original untouched.
+ */
+export async function rebuildRoll(
+  roll: AnyObject,
+  config: AnyObject,
+  message: AnyObject,
+  label: string,
+): Promise<AnyObject | null> {
+  const rollClass = roll["constructor"] as AnyObject | undefined;
+  if (
+    typeof rollClass?.["createRollInstance"] !== "function" ||
+    typeof rollClass?.["buildEvaluate"] !== "function"
+  ) {
+    console.warn(`${LOG_PREFIX} ${label}: cannot rebuild this roll — leaving it alone.`);
+    return null;
+  }
+
+  // The dice the table watched belong to the roll being discarded; the
+  // replacement's have never been seen and must animate normally. Cleared
+  // through `config`, which the old roll and the new one share as their options.
+  clearEarlyDice(config);
+
+  const rerolled = rollClass["createRollInstance"](config) as AnyObject;
+  await rollClass["buildEvaluate"](rerolled, config, message);
+
+  try {
+    const from = (roll["dice"] ?? []) as AnyObject[];
+    const to = (rerolled["dice"] ?? []) as AnyObject[];
+    for (let index = 0; index < to.length; index += 1) {
+      const options = from[index]?.["options"];
+      if (options && to[index]) to[index]!["options"] = options;
+    }
+  } catch (error) {
+    // Cosmetic only: without this the reroll animates in default colours.
+    console.warn(`${LOG_PREFIX} ${label}: could not carry the dice presets over.`, error);
+  }
+
+  return rerolled;
+}
+
+/**
  * The roll type a window should match on — `attack`, `spellcast`, `trait`,
  * `diceSet` — or null when it is not knowable.
  *
