@@ -160,26 +160,40 @@ function describeOffer(offer: PromptOffer): string {
  * the documented way to get at it — so the timeout can close the dialog rather
  * than leaving a live one on screen whose answer would be ignored. `rejectClose:
  * false` makes dismissal resolve `null` instead of throwing.
+ *
+ * `untimed` drops the timer altogether. The 30 seconds exist because most callers
+ * are mid-pipeline holding a roll back, and a dialog nobody is at must not freeze
+ * the table — so a caller that is holding *nothing* back has no reason to impose
+ * it, and every reason not to: a question raised after an action has already
+ * resolved can only be answered once, and expiring it silently loses the answer.
+ * Same judgement `chooseOne` and `chooseFromList` make by not coming through here
+ * at all; this flag is for a prompt that needs the rest of the wiring.
  */
 async function waitWithTimeout(
   config: AnyObject,
   onRender?: (root: HTMLElement) => void,
+  untimed = false,
 ): Promise<unknown> {
   let dialog: AnyObject | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
-  const timeout = new Promise<null>((resolve) => {
-    timer = setTimeout(() => {
-      // Closing resolves the dialog's own promise too; the race has already been
-      // decided, so that result is simply discarded.
-      try {
-        void dialog?.["close"]?.();
-      } catch {
-        /* Already gone. Nothing to do. */
-      }
-      resolve(null);
-    }, PROMPT_TIMEOUT_MS);
-  });
+  // Not merely un-raced when `untimed`: the timer closes the dialog when it
+  // fires, so one started and then ignored would still shut the question down
+  // half a minute in.
+  const timeout = untimed
+    ? null
+    : new Promise<null>((resolve) => {
+        timer = setTimeout(() => {
+          // Closing resolves the dialog's own promise too; the race has already
+          // been decided, so that result is simply discarded.
+          try {
+            void dialog?.["close"]?.();
+          } catch {
+            /* Already gone. Nothing to do. */
+          }
+          resolve(null);
+        }, PROMPT_TIMEOUT_MS);
+      });
 
   const { DialogV2 } = foundry.applications.api;
   const answered = DialogV2.wait({
@@ -202,7 +216,7 @@ async function waitWithTimeout(
   }).catch(() => null);
 
   try {
-    return await Promise.race([answered, timeout]);
+    return timeout ? await Promise.race([answered, timeout]) : await answered;
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
@@ -285,6 +299,13 @@ export async function chooseOffers(request: PromptRequest): Promise<Set<string>>
 /**
  * One candidate in a {@link chooseUpTo} prompt: a party with an id to answer
  * with, and an optional line of context under the name.
+ *
+ * {@link PromptParty.img} stays optional here in a way it does not on a banner.
+ * A prompt whose choices are *people* gives every row a portrait and falls back
+ * to core's mystery-man for the one that has none; a prompt whose choices are the
+ * printed clauses of a card has no portraits at all, and a column of mystery-men
+ * beside three sentences would be worse than no column. So the artwork is on when
+ * **any** choice supplies it and off when none does — see {@link chooseUpTo}.
  */
 export interface PromptChoice extends PromptParty {
   /** What the answer identifies this choice by — a token id, in practice. */
@@ -304,13 +325,44 @@ export interface ChoiceRequest {
   /** Localized confirm button — it should name the price, not just say "OK". */
   confirmLabel: string;
   /**
-   * Localized decline button. Required rather than falling back to the shared
-   * `EE.Features.PromptSkip`: that one reads "leave the roll alone", which is
-   * right for a feature that would have *rewritten* a roll and wrong here, where
-   * declining just means the attack goes at whoever it already went at. Word it
-   * as the counterpart of {@link confirmLabel}, not as a cancel.
+   * Localized decline button, when there is one.
+   *
+   * Never falls back to the shared `EE.Features.PromptSkip`: that one reads
+   * "leave the roll alone", which is right for a feature that would have
+   * *rewritten* a roll and wrong here, where declining just means the attack goes
+   * at whoever it already went at. Word it as the counterpart of
+   * {@link confirmLabel}, not as a cancel.
+   *
+   * Omit it when "none" is not a *different answer* but simply an empty one. Two
+   * buttons are worth having when they are two decisions the player weighs
+   * ("spread the attack" against "leave it on one target"); they are noise when
+   * the second only means the first with nothing ticked, and one Confirm reading
+   * back whatever the boxes say is the honest control. Pair that with
+   * {@link emptyConfirm} so an empty Confirm is still a deliberate act, and note
+   * the window's close button and Escape both remain — dismissal already means
+   * "nothing", and always has.
    */
-  declineLabel: string;
+  declineLabel?: string;
+  /**
+   * Localized question to ask when Confirm is pressed with **nothing** ticked.
+   *
+   * Only meaningful without a {@link declineLabel}: when a single Confirm is the
+   * whole of the controls, an empty press and a full one look identical, and one
+   * of them throws the choice away. This turns it into a second, deliberate act
+   * rather than a disabled button — the rule may well allow taking nothing, and a
+   * control that refuses to be pressed cannot say so.
+   */
+  emptyConfirm?: string;
+  /**
+   * Drop the 30-second timeout.
+   *
+   * Set it only when nothing is being held back while the player decides. The
+   * timeout is there so a dialog nobody is at cannot freeze a roll mid-pipeline;
+   * a prompt raised *after* an action has resolved is holding nothing, and
+   * expiring one of those throws away a choice the player can no longer make
+   * again. See {@link waitWithTimeout}.
+   */
+  untimed?: boolean;
 }
 
 /**
@@ -332,17 +384,27 @@ export interface ChoiceRequest {
  * which a two-button "Use it / Skip" would quietly turn back into a yes/no.
  */
 export async function chooseUpTo(request: ChoiceRequest): Promise<string[]> {
-  const { title, intro, choices, max, confirmLabel, declineLabel } = request;
+  const { title, intro, choices, max, confirmLabel, declineLabel, emptyConfirm, untimed } =
+    request;
   if (choices.length === 0 || max <= 0) return [];
+
+  // All rows or none: a list where one person has artwork and the next does not
+  // still wants the column, so the missing one gets the mystery-man. A list where
+  // *nobody* does is not a list of people at all — see `PromptChoice`.
+  const withArt = choices.some((choice) => Boolean(choice.img));
 
   const rows = choices
     .map(
       (choice) =>
         `<label class="ee-feature-choice">
           <input type="checkbox" name="${escapeHtml(choice.id)}">
-          <img class="ee-feature-portrait" src="${escapeHtml(
-            choice.img || PLACEHOLDER_PORTRAIT,
-          )}" alt="" draggable="false">
+          ${
+            withArt
+              ? `<img class="ee-feature-portrait" src="${escapeHtml(
+                  choice.img || PLACEHOLDER_PORTRAIT,
+                )}" alt="" draggable="false">`
+              : ""
+          }
           <span class="ee-feature-choice-name">${escapeHtml(choice.name)}</span>
           ${choice.detail ? `<span class="hint">${escapeHtml(choice.detail)}</span>` : ""}
         </label>`,
@@ -353,7 +415,9 @@ export async function chooseUpTo(request: ChoiceRequest): Promise<string[]> {
     {
       classes: ["ee-feature-prompt"],
       window: { title },
-      content: `<p>${escapeHtml(intro)}</p><div class="ee-feature-choices">${rows}</div>`,
+      content: `<p>${escapeHtml(intro)}</p><div class="ee-feature-choices${
+        withArt ? "" : " ee-feature-choices-plain"
+      }">${rows}</div>`,
       buttons: [
         {
           action: "confirm",
@@ -371,10 +435,16 @@ export async function chooseUpTo(request: ChoiceRequest): Promise<string[]> {
             return { picked };
           },
         },
-        { action: "skip", label: declineLabel },
+        // Only when declining is a *different* answer rather than an empty one —
+        // see `ChoiceRequest.declineLabel`.
+        ...(declineLabel ? [{ action: "skip", label: declineLabel }] : []),
       ],
     },
-    (root) => limitSelection(root, max),
+    (root) => {
+      limitSelection(root, max);
+      if (emptyConfirm) guardEmptyConfirm(root, title, emptyConfirm);
+    },
+    untimed === true,
   );
 
   const picked = (answer as AnyObject | null)?.["picked"];
@@ -402,6 +472,69 @@ function limitSelection(root: HTMLElement, max: number): void {
 
   for (const box of boxes) box.addEventListener("change", sync);
   sync();
+}
+
+/**
+ * Make an *empty* Confirm a second, deliberate press.
+ *
+ * ## Why the listener is on the button, in the capture phase
+ *
+ * `DialogV2` reaches `_onSubmit` two ways, and both have to be stopped. Its
+ * buttons are `type="submit"`, so a click submits the form its `_renderHTML`
+ * listens on; and `_initializeApplicationOptions` *also* registers every button's
+ * `action` into ApplicationV2's delegated click dispatch. `preventDefault` handles
+ * the first, `stopImmediatePropagation` the second — and capture on the button
+ * itself is the only place that runs before an ancestor's bubble listener.
+ *
+ * The re-press is a real `click()` rather than a reach into the dialog's
+ * internals, so the answer travels the same path it would have travelled a moment
+ * earlier; `armed` is what lets it through. Nothing resets `armed`, because by
+ * then the dialog is closing.
+ *
+ * A failure anywhere here leaves the button working normally, which is the right
+ * way to fail: the confirmation is a guard against a slip, not a rule.
+ */
+function guardEmptyConfirm(root: HTMLElement, title: string, question: string): void {
+  const button = root.querySelector<HTMLButtonElement>('button[data-action="confirm"]');
+  if (!button) return;
+
+  const anyTicked = (): boolean =>
+    Array.from(
+      root.querySelectorAll<HTMLInputElement>('.ee-feature-choice input[type="checkbox"]'),
+    ).some((box) => box.checked);
+
+  let armed = false;
+
+  button.addEventListener(
+    "click",
+    (event) => {
+      if (armed || anyTicked()) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      void (async () => {
+        try {
+          const confirmed = await foundry.applications.api.DialogV2.confirm({
+            classes: ["ee-feature-prompt"],
+            window: { title },
+            content: `<p>${escapeHtml(question)}</p>`,
+            rejectClose: false,
+          });
+          if (confirmed !== true) return;
+          armed = true;
+          button.click();
+        } catch (error) {
+          // Let the press through rather than trapping the player behind a
+          // confirmation that cannot be answered.
+          console.warn(`${LOG_PREFIX} Feature prompt: could not confirm an empty choice.`, error);
+          armed = true;
+          button.click();
+        }
+      })();
+    },
+    true,
+  );
 }
 
 /** Everything needed to raise a {@link confirmChoice} prompt. */

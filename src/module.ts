@@ -11,6 +11,7 @@ import { registerDeckLimitGuard } from "./daggerheart/deck-limit-guard.js";
 import { registerDeckLimitWizard } from "./daggerheart/deck-limit-wizard.js";
 import { registerAdaptability } from "./daggerheart/adaptability.js";
 import { registerAdversaryAttack } from "./daggerheart/adversary-attack.js";
+import { registerAttackOfOpportunity } from "./daggerheart/attack-of-opportunity.js";
 import { registerBloodMaledict } from "./daggerheart/blood-maledict.js";
 import { registerBloodSpike } from "./daggerheart/blood-spike.js";
 import { registerCardTargeting } from "./daggerheart/card-targeting.js";
@@ -54,9 +55,18 @@ Hooks.once("init", async () => {
   registerDeckLimitGuard();
   registerDeckLimitBrowser();
   registerDeckLimitWizard();
-  // Both patch the system's data preparation, so they have to be in place before
-  // any document is constructed — `init` is the last hook that guarantees that.
-  // Reach first, so the Companion card's patch wraps it and therefore runs last:
+  // Every one of these patches the system's data preparation, so they have to be
+  // in place before any document is constructed — `init` is the last hook that
+  // guarantees that.
+  //
+  // Attack of Opportunity first, and *before* Reach: these patches nest, so the
+  // one installed earliest runs innermost. Its derived action is therefore already
+  // in `system.actions` when Reach walks them, which is what lets a Giant Warrior's
+  // Attack of Opportunity reach Very Close like everything else they own. After
+  // Reach it would be injected too late to be promoted, and the one action on the
+  // sheet still printing Melee would be the one whose whole trigger is a range.
+  registerAttackOfOpportunity();
+  // Reach next, so the Companion card's patch wraps it and therefore runs last:
   // the companion's attack reaches as far as the companion does, whatever the
   // ranger's ancestry says about their own arms. See `CachedActions.ranges`.
   registerReach();

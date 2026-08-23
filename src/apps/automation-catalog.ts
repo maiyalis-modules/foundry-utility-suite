@@ -227,7 +227,22 @@ const CLASSES: Catalog = {
     plain("Rogue"),
     plain("Seraph"),
     plain("Sorcerer"),
-    plain("Warrior"),
+    {
+      id: "warrior",
+      label: "Warrior",
+      groups: [
+        {
+          legend: "EE.Automation.FeaturesLegend",
+          settings: [
+            {
+              key: SETTINGS.attackOfOpportunity,
+              name: "EE.Settings.AttackOfOpportunity.Name",
+              hint: "EE.Settings.AttackOfOpportunity.Hint",
+            },
+          ],
+        },
+      ],
+    },
     plain("Wizard"),
     fromVoid("Assassin"),
     {

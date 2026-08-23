@@ -1241,9 +1241,11 @@ loads).
   - **Third patch on `Item#prepareEmbeddedDocuments`** after Reach and Companion,
     and the only one with no ordering to respect. Same reasoning as both: nothing
     is written to the database, so the rule un-applies itself, and
-    `reconcileCloseKnitCards` exists for the setting changing mid-session. Three
-    file-local copies of that prototype-patch helper now exist — an extraction
-    candidate, deliberately not taken while Reach and Companion are working.
+    `reconcileCloseKnitCards` exists for the setting changing mid-session. **Four**
+    file-local copies of that prototype-patch helper now exist (Attack of
+    Opportunity is the fourth) — a standing extraction candidate, deliberately not
+    taken while all of them are working, since it would touch the two patches
+    whose *ordering* carries a rule.
   - **Two house prompts rather than a bespoke dialog**: `chooseOne` rows for the
     ally (portrait, name, their Hope over their max), then `chooseFromList` for
     the amount. Neither has a timeout, because nothing is being held back while
@@ -1347,6 +1349,127 @@ loads).
     hand; the colour does it instead, and the sentence is free to ask the
     question. There is no hint under the box for the same reason — the label is
     one line, and the notification after a tick says where the preference went.
+- **Attack of Opportunity** (`src/daggerheart/attack-of-opportunity.ts`) — the
+  Warrior's (SRD p.23) "If an adversary within Melee range attempts to leave that
+  range, make a reaction roll using a trait of your choice against their
+  Difficulty. Choose one effect on a success, or two if you critically succeed."
+  `Compendium.daggerheart.classes.Item.3hNVqD1c0VIw2Nj5`, which ships
+  `actions: {}`. World setting `attackOfOpportunity`, **on** by default, filed
+  under Warrior in the Classes tab.
+  - **The trigger is deliberately a button, not the trigger.** The printed trigger
+    is a movement, and at this table tokens are invisible to players and shuffled
+    by the GM to express positioning rather than to move a creature in the
+    fiction. A `updateToken` watcher would fire on housekeeping — a reaction going
+    off when nobody reacted is a worse failure than one that has to be asked for.
+    Everything *after* the press is automated, because everything after it is
+    mechanical.
+  - **One derived `attack` action, and the type is load-bearing.** `roll` is only
+    in `DHAttackAction`'s schema, so it is the only shape that can carry "make a
+    reaction roll" at all. `damage.main: null` keeps the damage half asleep
+    (`hasDamage` false → `DamageField.execute` returns at once), which is right:
+    the damage this card deals is the *weapon's*, decided after the roll. Named
+    after the card, because `prepareBaseConfig` prefixes the Item's name onto the
+    roll title unless the two match exactly. `chatDisplay: false`, so the card's
+    rules text stays out of the roll card and what goes to chat is the
+    announcement of what was chosen.
+  - **Four things the system already does**, once that action exists.
+    `actionType: "reaction"` is read in four places (no Hope/Fear gained, no
+    countdown advanced, a reroll that doesn't settle up, and the card titled
+    "Reaction Roll"). "A trait of your choice" is the `<select name="trait">` the
+    roll dialog already renders for any non-`lite` character Duality roll.
+    "Against their Difficulty" is `D20Roll.buildEvaluate` scoring on
+    `config.roll.difficulty ?? target.difficulty ?? target.evasion` — declaring
+    *no* difficulty is what makes it read the target's. And the target picker is
+    `daggerheart-target-helper`, which engages on `config.hasTarget` plus a
+    non-`self` type.
+  - **`target.type` is `any`, not `hostile`**, though the card says adversary.
+    `TargetField.isTargetFriendly` compares dispositions
+    (`actorDisposition + targetDisposition === 0`), so a hostile filter silently
+    offers nobody when the GM's tokens sit at neutral — which on a map that exists
+    only for range they routinely do. A filter that fails closed would take the
+    feature away in exactly the situation it is for.
+  - **Two things `preUseAction` sets that the action cannot declare.** The roll
+    dialog is **forced open**: a world with the system's roll automation on has
+    `RollField.prepareConfig` invert `dialog.configure`, and the trait dropdown
+    lives *only* in that dialog, so the press would roll without asking. And
+    `config.roll.trait` is set to the character's **highest** trait, because an
+    action can only declare a fixed one and `DHActionRollData#rollTrait` falls
+    back to `agility` for a feature Item with no `system.attack` — the same wrong
+    answer for everybody. Ties go to the printed order (`CONFIG.DH.ACTOR.abilities`
+    is already in it). It stays a dropdown; this decides only where it opens.
+    `preUseAction` is the seam for both because it fires after `prepareConfig` —
+    so after that inversion, and once `config.roll` exists — and before anything
+    reads either value; both `applyKeybindings` implementations assign
+    `dialog.configure` with `??=`, so a value set there survives to
+    `buildConfigure`.
+  - **The effects prompt** is `chooseUpTo` with `max` of one, or two on a
+    critical, raised from `postUseAction` and only on `config.roll.success ===
+    true`. A failed reaction buys nothing and the chat card already says so, so
+    that path is silent — a dialog whose only honest content is "no" is noise. No
+    targets at all *is* worth a notification: the player has just made a roll that
+    cannot be scored and nothing else on screen says why.
+  - `feature-prompt.ts` grew four things for it, all on `chooseUpTo`.
+    `PromptChoice.img` is now genuinely optional: portraits are drawn when **any**
+    choice supplies one and omitted when none does, because a column of
+    mystery-men beside three printed sentences is worse than no column
+    (`.ee-feature-choices-plain` is the three-column variant).
+    `ChoiceRequest.untimed` drops the 30s timeout — the timeout exists so a dialog
+    nobody is at cannot freeze a roll mid-pipeline, and this one is raised *after*
+    the roll is posted, where expiring it would throw away a choice that cannot be
+    made again; note `waitWithTimeout` does not merely stop racing the timer, it
+    never starts it, since the timer *closes* the dialog when it fires.
+    `declineLabel` became **optional**: two buttons are worth having when they are
+    two decisions the player weighs (Hold Them Off's "spread it" against "leave
+    it"), and are noise when the second is only the first with nothing ticked — so
+    this prompt has one Confirm that reads back whatever the boxes say. And
+    `emptyConfirm` guards the empty press, because with a single button an empty
+    Confirm and a full one look identical and one of them throws the choice away.
+    A confirmation rather than a disabled button: the rule does not force an effect
+    on you, and a control that refuses to be pressed cannot say so.
+  - **Blocking that empty press takes a capture-phase listener on the button
+    itself.** `DialogV2` reaches `_onSubmit` two ways — its buttons are
+    `type="submit"` so a click submits the form `_renderHTML` listens on, *and*
+    `_initializeApplicationOptions` registers every button's `action` into
+    ApplicationV2's delegated click dispatch. `preventDefault` stops the first,
+    `stopImmediatePropagation` the second, and capture on the button is the only
+    place that runs before an ancestor's bubble listener. The re-press is a real
+    `button.click()` past an `armed` flag rather than a reach into the dialog's
+    internals, so the answer travels the path it would have a moment earlier.
+  - **The damage is the weapon's own damage step, with the attack roll skipped.**
+    `attack.prepareConfig(event, { hasRoll: false })` produces the shape a
+    `damage`-type action has natively (`RollField.prepareConfig` returns early, so
+    `config.roll` is never populated), and
+    `workflow.get("damage").execute(config, null, true)` is the same call the chat
+    card's own **Roll Damage** button makes. `force` is set on purpose: without it
+    a world whose damage automation is *never* would do nothing, and unlike an
+    attack there is no card here with a damage button to fall back to. Rolling to
+    hit again would be a second chance to miss something the rule says has already
+    been hit.
+  - **`config.effects` has to be supplied when calling the workflow directly.**
+    `DHRoll`'s constructor builds `options.bonusEffects` from it and
+    `calculateTotalModifiers` then reads that *without* guarding, so a missing list
+    is a thrown error rather than a missing bonus. `use()` fills it in; we don't
+    go through `use()`, so it comes from the system's own
+    `getActionRelevantEffects`.
+  - **The targets carry over and are marked hit**, which is the rule rather than a
+    convenience — the effect is *chosen on a success*. `applyDamage` is then called
+    **unforced**, so whether the numbers move on their own or wait for the GM's
+    Apply button stays the world's answer, as for any other attack.
+  - **Registered before `registerReach()`**, and that is the one ordering that
+    matters. These preparation patches nest, so the earliest-installed runs
+    innermost: under Reach's, the injected action is already in `system.actions`
+    when Reach walks them, and a Giant Warrior's Attack of Opportunity reaches Very
+    Close like everything else they own. Registered after Reach, the one action on
+    the sheet still printing *Melee* would be the one whose whole trigger is a
+    range.
+  - **Not automated:** the trigger (above); "they can't move" and "you move with
+    them", which are statements about a map this table's GM owns, so they are
+    announced and left there; range, which the action declares as `melee` for the
+    picker's benefit but nothing enforces; and a weapon whose damage changes on a
+    Fear result, which rolls its base value because
+    `DamageField.getFormulaValue` reads `config.roll.result.duality` and there is
+    no roll on the damage config — passing the *reaction* roll's would mean handing
+    the damage card a half-formed roll to render.
 - **Card targeting** (`src/daggerheart/card-targeting.ts`) — the single wrapper
   around `DHBaseAction#use` behind every card that declares a target it must not
   ask for. Features register a predicate with `untargetAction(rule)`; the patch
@@ -1596,7 +1719,8 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Crimson Rite and Hybrid Form under Blood Hunter; Hold Them Off, Ranger's
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
-    Tracker under Sage, Not Good Enough under Blade). A subclass has no home of
+    Tracker under Sage, Not Good Enough under Blade, Attack of Opportunity under
+    Warrior). A subclass has no home of
     its own, so its rules are filed under its parent class in a group of their own — Hybrid Form under
     Blood Hunter, Beastbound under Ranger. All four
     content tabs render

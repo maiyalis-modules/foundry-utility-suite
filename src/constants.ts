@@ -247,6 +247,21 @@ export const SETTINGS = {
    */
   closeKnitShareHope: "closeKnitShareHope",
   /**
+   * Master switch for automating **Attack of Opportunity** (Warrior class
+   * feature): put a button on a card the SRD ships as prose, so the player can
+   * make the reaction roll — trait of their choice, scored against the target's
+   * Difficulty — and then be asked which of the card's three effects the result
+   * bought, one on a success and two on a critical. Choosing the damage clause
+   * rolls the primary weapon's damage. See `daggerheart/attack-of-opportunity.ts`.
+   *
+   * World-scoped and **on** by default, for the same reason as
+   * {@link SETTINGS.closeKnitShareHope}, whose card this one resembles: the action
+   * is built during data preparation on every client that prepares the card, so a
+   * per-user answer would put a button on one screen and not another. Switching it
+   * off returns the card to being description-only.
+   */
+  attackOfOpportunity: "attackOfOpportunity",
+  /**
    * Master switch for automating **Not Good Enough** (Blade domain): after a
    * character holding the card rolls damage, offer to reroll every damage die
    * that came up 1 or 2 — before the result reaches the chat card, so the table

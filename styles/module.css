@@ -470,6 +470,19 @@
   white-space: nowrap;
 }
 
+/* A choice list with nothing to put a portrait beside — the printed clauses of a
+ * card rather than the people in the room. One column fewer, and the label reads
+ * as the sentence it is instead of as a name. */
+.ee-feature-prompt .ee-feature-choices-plain .ee-feature-choice {
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+}
+
+.ee-feature-prompt .ee-feature-choices-plain .ee-feature-choice-name {
+  font-weight: normal;
+  white-space: normal;
+}
+
 /* The limit made visible: once two are ticked the rest stop responding, rather
  * than accepting a third click and quietly dropping it at confirm time. */
 .ee-feature-prompt .ee-feature-choice:has(input:disabled) {
