@@ -128,7 +128,22 @@ const ANCESTRIES: Catalog = {
         },
       ],
     },
-    plain("Katari"),
+    {
+      id: "katari",
+      label: "Katari",
+      groups: [
+        {
+          legend: "EE.Automation.FeaturesLegend",
+          settings: [
+            {
+              key: SETTINGS.felineInstinctsReroll,
+              name: "EE.Settings.FelineInstinctsReroll.Name",
+              hint: "EE.Settings.FelineInstinctsReroll.Hint",
+            },
+          ],
+        },
+      ],
+    },
     plain("Orc"),
     plain("Ribbet"),
     plain("Simiah"),

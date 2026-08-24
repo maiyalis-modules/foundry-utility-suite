@@ -21,6 +21,7 @@ import { registerCrimsonRite } from "./daggerheart/crimson-rite.js";
 import { registerDualityOutcome } from "./daggerheart/duality-outcome.js";
 import { registerFearless } from "./daggerheart/fearless.js";
 import { registerFeatureAsk } from "./daggerheart/feature-ask.js";
+import { registerFelineInstincts } from "./daggerheart/feline-instincts.js";
 import { registerGiftedTracker } from "./daggerheart/gifted-tracker.js";
 import { registerHoldThemOff } from "./daggerheart/hold-them-off.js";
 import { registerISeeItComing } from "./daggerheart/i-see-it-coming.js";
@@ -98,6 +99,12 @@ Hooks.once("init", async () => {
   // moment later. (It also carries a chat-card control for rolls the system
   // never scores, which takes no part in this ordering.)
   registerAdaptability();
+  // Beside Adaptability and for the same reason, though it buys a narrower
+  // thing: it rerolls the Hope Die alone, which *is* the Hope/Fear result, so it
+  // has to settle before the duality window asks anything about that result.
+  // After Adaptability only because a character holding both would rather be
+  // asked about the whole roll before being asked about one of its dice.
+  registerFelineInstincts();
   registerDualityOutcome();
   registerAdversaryAttack();
   // Its own window rather than a registry feature — one card's rule, not a

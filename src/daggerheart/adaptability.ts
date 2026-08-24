@@ -81,7 +81,7 @@
  * badge reads `roll.options.roll.success` for its "miss" styling and a
  * result-based damage part reads `roll.options.roll.result.duality` — and the
  * system's own context-menu reroll leaves both describing the discarded dice.
- * {@link refreshSnapshot} brings them back into step, mirroring `buildEvaluate`
+ * {@link refreshRollSnapshot} brings them back into step, mirroring `buildEvaluate`
  * (Daggerheart 2.7.2) rather than inventing a second set of rules. Target hits
  * need nothing: `ChatMessage#_getCurrentTargets` recomputes those from the Roll
  * object on every render, which is what makes replacing `message.rolls[0]`
@@ -112,6 +112,7 @@ import {
 } from "./feature-registry.js";
 import {
   rebuildRoll,
+  refreshRollSnapshot,
   registerRollWindow,
   rollVisibility,
   showDiceEarly,
@@ -130,10 +131,6 @@ const MATCH: FeatureMatch = {
 /** The printed price: mark one Stress. */
 const STRESS = "stress";
 const COST: readonly FeatureCost[] = [{ key: STRESS, value: 1 }];
-
-/** The system's duality encoding, shared by `config.roll.result.duality`. */
-const WITH_HOPE = 1;
-const WITH_FEAR = -1;
 
 /**
  * Dataset key marking a card this has already decorated. Per-render rather than
@@ -305,82 +302,6 @@ function offerFor(message: AnyObject): Offer | null {
   return { roll, actor };
 }
 
-/**
- * Bring `roll.options.roll` back into step with the dice that were just thrown.
- *
- * Mirrors the three `buildEvaluate` overrides (`DHRoll`, `D20Roll`,
- * `DualityRoll`, Daggerheart 2.7.2) over the fields that describe an outcome.
- * `extra` is deliberately left alone: it is derived from `roll.baseTerms`, which
- * only `configureModifiers` fills in and a cloned roll never runs, so computing
- * it here would report every die as an extra one.
- */
-function refreshSnapshot(roll: AnyObject): void {
-  const snapshot = roll["options"]?.["roll"] as AnyObject | undefined;
-  if (!snapshot) return;
-
-  const rerolledOf = (die: AnyObject | undefined): AnyObject => {
-    const results = (die?.["results"] ?? []) as AnyObject[];
-    return {
-      any: results.some((result) => result["rerolled"]),
-      rerolls: results.filter((result) => result["rerolled"]),
-    };
-  };
-
-  const dieRecord = (die: AnyObject | undefined): AnyObject => ({
-    dice: die?.["denomination"],
-    value: Number(die?.["total"] ?? 0),
-    rerolled: rerolledOf(die),
-  });
-
-  const hope = roll["dHope"] as AnyObject | undefined;
-  const fear = roll["dFear"] as AnyObject | undefined;
-  const advantage = roll["dAdvantage"] as AnyObject | undefined;
-  const critical = roll["isCritical"] === true;
-  const total = Number(roll["total"] ?? 0);
-
-  snapshot["total"] = total;
-  snapshot["formula"] = roll["formula"];
-  snapshot["isCritical"] = critical;
-  snapshot["modifierTotal"] = roll["modifierTotal"];
-  snapshot["dice"] = ((roll["dice"] ?? []) as AnyObject[]).map((die) => ({
-    dice: die["denomination"],
-    total: die["total"],
-    formula: die["formula"],
-    results: ((die["results"] ?? []) as AnyObject[]).filter((result) => !result["rerolled"]),
-    rerolled: rerolledOf(die),
-  }));
-  snapshot["hope"] = dieRecord(hope);
-  snapshot["fear"] = dieRecord(fear);
-  snapshot["result"] = {
-    duality: roll["withHope"] ? WITH_HOPE : roll["withFear"] ? WITH_FEAR : 0,
-    total: Number(hope?.["total"] ?? 0) + Number(fear?.["total"] ?? 0),
-    label: roll["totalLabel"],
-  };
-
-  // The advantage *mode* was chosen before the dice and does not change; only
-  // the die that mode called for was thrown again.
-  snapshot["advantage"] = {
-    type: (snapshot["advantage"] as AnyObject | undefined)?.["type"],
-    dice: advantage?.["denomination"],
-    value: advantage?.["total"],
-  };
-
-  // Success and each target's hit, derived exactly as `D20Roll.buildEvaluate`
-  // derives them: a difficulty typed into the dialog wins, then the target's
-  // own, then its Evasion. A roll with neither keeps `success` as it was —
-  // undefined — so the card goes on saying nothing about an outcome it cannot
-  // know.
-  const targets = (roll["options"]?.["targets"] ?? []) as AnyObject[];
-  if (targets.length > 0) {
-    for (const target of targets) {
-      const difficulty = snapshot["difficulty"] ?? target["difficulty"] ?? target["evasion"];
-      target["hit"] = critical || total >= Number(difficulty);
-    }
-    snapshot["success"] = targets.some((target) => target["hit"] === true);
-  } else if (snapshot["difficulty"]) {
-    snapshot["success"] = critical || total >= Number(snapshot["difficulty"]);
-  }
-}
 
 /**
  * Say what happened, to whoever the original roll was visible to.
@@ -445,7 +366,7 @@ async function reroll(message: AnyObject, offer: Offer): Promise<void> {
       return;
     }
 
-    refreshSnapshot(rerolled);
+    refreshRollSnapshot(rerolled);
     await message["update"]?.({ rolls: [rerolled] });
     await announce(rerolled, offer.actor);
   } catch (error) {

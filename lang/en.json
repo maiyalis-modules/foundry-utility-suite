@@ -89,6 +89,8 @@
   "EE.Settings.AdaptabilityReroll.Hint": "Let a character holding the Human \"Adaptability\" feature use it: any roll that spent Hope on one of their own Experiences gets a \"Mark a Stress to reroll\" button on its chat card. The Stress is marked, the dice are thrown again on the same modifiers, and the card updates in place — including the Hope or Fear the first result had already given out. The button is withdrawn once the roll is a success the system can see; on a roll whose difficulty only the GM knows it stays available, because nothing here can tell whether it failed. Nothing happens unless the player presses it.",
   "EE.Settings.FearlessFearToHope.Name": "Fearless",
   "EE.Settings.FearlessFearToHope.Hint": "Let a character holding the Infernis \"Fearless\" feature use it: whenever they roll with Fear, offer to mark 2 Stress and turn it into a roll with Hope. Taking the offer converts the roll before anything reacts to the Fear — the GM gains no Fear, Fear countdowns don't advance, and other features that trigger on a Fear roll never fire. Declining, or letting the prompt time out, leaves the roll exactly as it landed.",
+  "EE.Settings.FelineInstinctsReroll.Name": "Feline Instincts",
+  "EE.Settings.FelineInstinctsReroll.Hint": "Let a character holding the Katari \"Feline Instincts\" feature use it: when an Agility roll comes up short, offer to spend 2 Hope and throw the Hope Die again. Only the Hope Die is rerolled — the Fear Die stays exactly as it landed — and the roll is re-scored from the new pair before anything acts on it, so the Hope or Fear, the countdowns and any hit all follow the second result rather than the first. The offer is only made on a roll the system scored as a miss; where the difficulty is the GM's to say out loud, nothing can tell whether it failed and no prompt is raised.",
   "EE.Settings.BloodMaledictReroll.Name": "Blood Maledict",
   "EE.Settings.BloodMaledictReroll.Hint": "Let a character holding the Void's \"Blood Maledict\" feature use it: whenever an adversary within Close range succeeds on an attack roll, offer to spend 3 Hope and make it reroll with disadvantage. The GM's client pauses the attack and puts the question on the character's owner's screen; taking it replaces the roll before the chat card is posted, so the original hit never becomes damage. Needs both actors on the scene — a range that can't be measured raises no prompt.",
   "EE.Settings.CrimsonRiteEnchant.Name": "Crimson Rite",
@@ -181,6 +183,11 @@
   "EE.Features.Adaptability.Tooltip": "Adaptability — reroll this, keeping every bonus including the Experience.",
   "EE.Features.Adaptability.Announce": "{actor} marks a Stress and rerolls — Adaptability.",
   "EE.Features.Adaptability.NoStress": "{actor} has no Stress left to mark.",
+
+  "EE.Features.FelineInstincts.Title": "Feline Instincts",
+  "EE.Features.FelineInstincts.Intro": "That Agility roll missed with a total of {total}. You can spend 2 Hope to throw the Hope Die again — it is showing {hope}, and the Fear Die ({fear}) stays as it landed.",
+  "EE.Features.FelineInstincts.Confirm": "Spend 2 Hope and reroll",
+  "EE.Features.FelineInstincts.Decline": "Let the roll stand",
 
   "EE.Features.Fearless.Label": "Fearless",
   "EE.Features.Fearless.Hint": "Mark 2 Stress to change this into a roll with Hope instead.",

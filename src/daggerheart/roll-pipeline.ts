@@ -82,6 +82,13 @@ const DSN_SKIP_FLAG = "flags.dice-so-nice.skip";
 const ROLL_TYPE = "eeRollType";
 
 /**
+ * The system's duality encoding, as it appears in `config.roll.result.duality`.
+ * Here rather than in a feature because {@link refreshRollSnapshot} writes it.
+ */
+const WITH_HOPE = 1;
+const WITH_FEAR = -1;
+
+/**
  * One interception point on the roll pipeline.
  *
  * Split into {@link matches} and {@link run} so the pipeline can tell "this
@@ -205,6 +212,76 @@ export async function showDiceEarly(roll: AnyObject, config: AnyObject): Promise
 }
 
 /**
+ * Animate **one rerolled die** on its own, without throwing the roll it belongs
+ * to a second time.
+ *
+ * ## The problem this solves
+ *
+ * {@link showDiceEarly} shows the roll, a window rerolls a single die of it, and
+ * then the chat message would ordinarily animate the whole roll again. Dice So
+ * Nice does not simply skip the dice that did not move: `DiceNotation` walks
+ * *every* result of every term, groups the ones marked `rerolled` into an
+ * earlier "throw" than the ones that replaced them, and animates both. What the
+ * table sees is the original pair landing on the same faces all over again,
+ * followed by a lone extra die — the reroll narrated backwards.
+ *
+ * So the message keeps its {@link showDiceEarly} suppression and the new face is
+ * animated here instead: one die, thrown once, which is what actually happened.
+ *
+ * ## The shape handed to Dice So Nice
+ *
+ * A duck-typed stand-in — `{_evaluated, dice, options}` — rather than a real
+ * Roll. That is the system's own idiom for this exact job (`DualityDie#reroll`
+ * and `BaseDie#reroll`, Daggerheart 2.7.2, both build one to animate a die they
+ * have just rerolled), and it is all `showForRoll` reads: `_stampDamageType`,
+ * `_stampAppearance` and `DiceNotation` want `roll.dice` and `roll.options`.
+ *
+ * The term is **copied, not borrowed**. The system's version assigns the
+ * filtered results back onto the live term, which throws away the record of what
+ * was rerolled — and that record is what puts the discarded face on the chat
+ * card, struck through. The copy carries the original's `options` so the die
+ * keeps the Hope or Fear appearance `setDiceSoNiceForDualityRoll` stamped on it.
+ *
+ * Returns whether the animation actually played.
+ */
+export async function showRerolledDie(term: AnyObject, config: AnyObject): Promise<boolean> {
+  const dice3d = game["dice3d"];
+  if (typeof dice3d?.showForRoll !== "function") return false;
+
+  try {
+    // The last *active* result is the one that just landed; everything before it
+    // has been rerolled away and has already had its moment on the table.
+    const results = (term["results"] ?? []) as AnyObject[];
+    const standing = results.filter((result) => result["active"] !== false).at(-1);
+    if (!standing) return false;
+
+    const TermClass = term["constructor"] as new (data: AnyObject) => AnyObject;
+    const single = new TermClass({
+      number: 1,
+      faces: term["faces"],
+      results: [{ result: standing["result"], active: true }],
+      // Deep-cloned because Dice So Nice writes into `options.appearance` while
+      // stamping, and this object is the live die's.
+      options: foundry.utils.deepClone(term["options"] ?? {}) as AnyObject,
+    });
+
+    // The same audience as the roll itself — see {@link showDiceEarly}.
+    const { whisper, blind } = rollVisibility(config);
+    const shown = await dice3d.showForRoll(
+      { _evaluated: true, dice: [single], options: { appearance: {} } },
+      game.user,
+      true,
+      whisper,
+      blind,
+    );
+    return shown !== false;
+  } catch (error) {
+    console.warn(`${LOG_PREFIX} Roll pipeline: could not show a rerolled die.`, error);
+    return false;
+  }
+}
+
+/**
  * Undo {@link showDiceEarly} for a roll that is about to be thrown away.
  *
  * A window that *replaces* the roll has to call this: the dice the table watched
@@ -303,6 +380,89 @@ export async function rebuildRoll(
   }
 
   return rerolled;
+}
+
+/**
+ * Bring `roll.options.roll` back into step with the dice that were just thrown.
+ *
+ * Mirrors the three `buildEvaluate` overrides (`DHRoll`, `D20Roll`,
+ * `DualityRoll`, Daggerheart 2.7.2) over the fields that describe an outcome.
+ * `extra` is deliberately left alone: it is derived from `roll.baseTerms`, which
+ * only `configureModifiers` fills in and a cloned roll never runs, so computing
+ * it here would report every die as an extra one.
+ *
+ * Lives here for the same reason {@link rebuildRoll} does: a feature that throws
+ * dice again has to answer this question however it threw them, and a second
+ * copy of the system's own field-by-field derivation would be one more thing to
+ * keep in step with it. Two callers so far — Adaptability, replacing a posted
+ * roll, and Feline Instincts, rerolling one die at the pipeline seam.
+ */
+export function refreshRollSnapshot(roll: AnyObject): void {
+  const snapshot = roll["options"]?.["roll"] as AnyObject | undefined;
+  if (!snapshot) return;
+
+  const rerolledOf = (die: AnyObject | undefined): AnyObject => {
+    const results = (die?.["results"] ?? []) as AnyObject[];
+    return {
+      any: results.some((result) => result["rerolled"]),
+      rerolls: results.filter((result) => result["rerolled"]),
+    };
+  };
+
+  const dieRecord = (die: AnyObject | undefined): AnyObject => ({
+    dice: die?.["denomination"],
+    value: Number(die?.["total"] ?? 0),
+    rerolled: rerolledOf(die),
+  });
+
+  const hope = roll["dHope"] as AnyObject | undefined;
+  const fear = roll["dFear"] as AnyObject | undefined;
+  const advantage = roll["dAdvantage"] as AnyObject | undefined;
+  const critical = roll["isCritical"] === true;
+  const total = Number(roll["total"] ?? 0);
+
+  snapshot["total"] = total;
+  snapshot["formula"] = roll["formula"];
+  snapshot["isCritical"] = critical;
+  snapshot["modifierTotal"] = roll["modifierTotal"];
+  snapshot["dice"] = ((roll["dice"] ?? []) as AnyObject[]).map((die) => ({
+    dice: die["denomination"],
+    total: die["total"],
+    formula: die["formula"],
+    results: ((die["results"] ?? []) as AnyObject[]).filter((result) => !result["rerolled"]),
+    rerolled: rerolledOf(die),
+  }));
+  snapshot["hope"] = dieRecord(hope);
+  snapshot["fear"] = dieRecord(fear);
+  snapshot["result"] = {
+    duality: roll["withHope"] ? WITH_HOPE : roll["withFear"] ? WITH_FEAR : 0,
+    total: Number(hope?.["total"] ?? 0) + Number(fear?.["total"] ?? 0),
+    label: roll["totalLabel"],
+  };
+
+  // The advantage *mode* was chosen before the dice and does not change; only
+  // the die that mode called for was thrown again.
+  snapshot["advantage"] = {
+    type: (snapshot["advantage"] as AnyObject | undefined)?.["type"],
+    dice: advantage?.["denomination"],
+    value: advantage?.["total"],
+  };
+
+  // Success and each target's hit, derived exactly as `D20Roll.buildEvaluate`
+  // derives them: a difficulty typed into the dialog wins, then the target's
+  // own, then its Evasion. A roll with neither keeps `success` as it was —
+  // undefined — so the card goes on saying nothing about an outcome it cannot
+  // know.
+  const targets = (roll["options"]?.["targets"] ?? []) as AnyObject[];
+  if (targets.length > 0) {
+    for (const target of targets) {
+      const difficulty = snapshot["difficulty"] ?? target["difficulty"] ?? target["evasion"];
+      target["hit"] = critical || total >= Number(difficulty);
+    }
+    snapshot["success"] = targets.some((target) => target["hit"] === true);
+  } else if (snapshot["difficulty"]) {
+    snapshot["success"] = critical || total >= Number(snapshot["difficulty"]);
+  }
 }
 
 /**

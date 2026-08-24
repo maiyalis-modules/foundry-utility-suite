@@ -241,6 +241,18 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // And again. Nothing to reconcile on change: the switch is read once per
+  // Agility roll, at the seam where the prompt would be raised, so turning it
+  // off simply stops the next roll asking.
+  game.settings.register(MODULE_ID, SETTINGS.felineInstinctsReroll, {
+    name: "EE.Settings.FelineInstinctsReroll.Name",
+    hint: "EE.Settings.FelineInstinctsReroll.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   // World-scoped for the same reason, and doubly so here: the roll happens on the
   // GM's client while the prompt appears on the player's, so a per-client answer
   // would let the two ends disagree about whether the reaction exists.

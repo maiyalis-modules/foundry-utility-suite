@@ -130,6 +130,18 @@ export const SETTINGS = {
    */
   adaptabilityReroll: "adaptabilityReroll",
   /**
+   * Master switch for automating **Feline Instincts** (Katari): on an Agility
+   * roll the system scored as a miss, offer to spend 2 Hope and throw the Hope
+   * Die again, keeping the Fear Die exactly as it landed. See
+   * `daggerheart/feline-instincts.ts`.
+   *
+   * World-scoped and **on** by default, for the same reasons as
+   * {@link SETTINGS.fearlessFearToHope}: it is the rule as printed on a card the
+   * system already charges for and does not apply, and it does nothing at all
+   * unless a player takes the offer at the prompt.
+   */
+  felineInstinctsReroll: "felineInstinctsReroll",
+  /**
    * Master switch for automating **Blood Maledict** (Blood Hunter, *Void for
    * Daggerheart*): when an adversary lands an attack within Close range, offer
    * the character 3 Hope to make it reroll at disadvantage — before the chat card

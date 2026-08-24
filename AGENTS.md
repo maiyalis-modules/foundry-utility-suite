@@ -406,6 +406,28 @@ loads).
     decides it. A window that **replaces** the roll must
     call `clearEarlyDice(config)` first: the dice the table watched belong to the
     discarded roll, and the replacement's have never been seen.
+  - **A window that rerolls only *part* of a roll must animate that part itself.**
+    Do **not** reach for `clearEarlyDice` there — that is for a window replacing
+    the roll outright. Dice So Nice does not skip the dice that did not move: its
+    `DiceNotation` walks every result of every term, groups the ones marked
+    `rerolled` into an *earlier* throw than the ones that replaced them, and
+    animates both. Letting the message animate after a one-die reroll therefore
+    shows the whole original set landing on its old faces, and only then the new
+    die — the reroll narrated backwards, which is exactly the bug Feline
+    Instincts shipped with. `showRerolledDie(term, config)` is the fix: the
+    message keeps its `eeDiceShown` suppression and the single new face is
+    animated on its own. It hands `showForRoll` a duck-typed
+    `{_evaluated, dice, options}` stand-in rather than a Roll, which is the
+    system's own idiom for the job (`DualityDie#reroll` and `BaseDie#reroll`,
+    Daggerheart 2.7.2, both build one) and is all DSN reads. The term is
+    **copied, not borrowed** — the system's version assigns filtered results back
+    onto the live term and so destroys the record of what was rerolled, which is
+    what puts the discarded face on the chat card struck through. The copy is
+    built through the term's own constructor, so a `HopeDie` stays a `HopeDie`,
+    and carries the original's `options` so it keeps the appearance
+    `setDiceSoNiceForDualityRoll` stamped on it. `showDiceEarly` being idempotent
+    is what lets a *loop* do this repeatedly: it reports the dice as shown without
+    throwing them again.
   - **Flipping the result** is done with a persisted marker, not by swapping dice.
     `withHope`/`withFear` are getters comparing the two dice totals with no setter,
     the chat card renders from the *Roll object* (`roll.totalLabel` in the system's
@@ -565,8 +587,8 @@ loads).
     `this._formula`, by then fully resolved — every modifier including the
     Experience is already a number in the string, so the reroll keeps them all and
     nothing is charged twice.
-  - **`refreshSnapshot` exists because the system's own reroll leaves the record
-    stale.** `config.roll` is a plain-object snapshot written by the three
+  - **`refreshRollSnapshot` exists because the system's own reroll leaves the
+    record stale.** `config.roll` is a plain-object snapshot written by the three
     `buildEvaluate` overrides and persisted with the message; the chat log's
     "Reroll Action" context entry replaces `message.rolls[0]` and updates none of
     it. Most of the card renders from the live Roll object, but the difficulty
@@ -575,14 +597,19 @@ loads).
     `buildEvaluate` (Daggerheart **2.7.2**) rather than inventing a second set of
     rules, and deliberately skips `extra`, which derives from `roll.baseTerms` —
     only `configureModifiers` fills that in, and a cloned roll never runs it, so
-    computing it here would report every die as an extra one.
+    computing it here would report every die as an extra one. **It lives in
+    `roll-pipeline.ts`**, moved out of this file when Feline Instincts became
+    its second caller — the same rule `rebuildRoll` followed.
   - **Target hits need nothing**, which is what makes swapping the roll enough:
     `DhRollMessage#_getCurrentTargets` recomputes `hitResult` from `this.roll` on
     every render. Same fact `i-see-it-coming.ts` relies on from the other
     direction — it is why a flipped `hit` flag there would be cosmetic.
   - **`message.system.successConsumed` is deliberately not touched.** It reads
     like "the roll succeeded" and is not: it marks that a `consumeOnSuccess`
-    action's deferred cost has already been charged.
+    action's deferred cost has already been charged. True *here* because this
+    path runs after the message exists and `CostField` has already had its
+    turn. A reroll at the **pipeline seam** is the opposite case and must
+    rewrite it — see Feline Instincts below.
   - Offered only to a client that could actually carry it out — the actor's owner,
     *and* whoever the system would let rewrite the message (`isAuthor` or GM).
     Both paths also stand down on a critical, which is a success in Daggerheart
@@ -603,6 +630,82 @@ loads).
   - `feature-registry.ts`'s `canAfford` is now exported alongside
     `findGrantingItem`, for the same reason: a feature with its own interception
     still has to withhold an offer nobody can pay for.
+- **Feline Instincts** (`src/daggerheart/feline-instincts.ts`) — the Katari
+  ancestry's (SRD p.30) "When you make an Agility Roll, you can spend 2 Hope to
+  reroll your Hope Die."
+  `Compendium.daggerheart.ancestries.Item.lNgbbYnCKgrdvA85`, a `feature` Item
+  whose one action ("Spend Hope") charges the 2 Hope and does nothing else —
+  the same empty shape Adaptability arrives in. World setting
+  `felineInstinctsReroll`, **on** by default, under **Ancestries → Katari**.
+  - **It rerolls one die, not the roll**, and that is the whole reason it is not
+    a branch inside `adaptability.ts`. There is no system path for it: the die is
+    thrown again in place, exactly the way core's own `r` modifier does it
+    (`Die#reroll`, `client/dice/terms/die.mjs`) — mark the standing result
+    `rerolled`, set `active = false`, `await term.roll({reroll: true})`.
+    `DiceTerm#total` sums only *active* results, so the term reports the new face
+    while the old one stays on the card struck through, which is the shape the
+    system's `rerolled.rerolls` field and its chat template already expect.
+  - **Two cached values then have to be put back by hand.** `Roll#total` is
+    `_total`, written once at evaluation and never recomputed from the terms —
+    refreshed with `roll._evaluateTotal()`, which is what core's own
+    `Roll.fromTerms` does. And `config.roll`, the plain-object record everything
+    downstream actually reads, is brought back into step with
+    `refreshRollSnapshot` from `roll-pipeline.ts`. Forget either and the dice on
+    the card disagree with the total beside them.
+  - **`config.successConsumed` *is* rewritten here**, which is the opposite of
+    what Adaptability does and is correct for the opposite reason. `CostField` is
+    workflow order **150** against `RollField`'s **10**, so at this seam the costs
+    have not been charged yet and will be charged against the success this reroll
+    just rewrote; the message must describe the same outcome or a
+    `consumeOnSuccess` cost gets charged twice. Adaptability's path runs after
+    both, so there it must be left alone.
+  - **Registered before `registerDualityOutcome()`**, like Adaptability and more
+    sharply: the Hope Die *is* the Hope/Fear result, so this has to settle before
+    Fearless asks whether to convert a Fear the player may be about to reroll
+    away. Placed after Adaptability, so a character holding both is asked about
+    the whole roll before being asked about one of its dice.
+  - **"An Agility Roll" is `config.roll.trait === "agility"`** — the field the
+    system fills in for both a sheet trait check (`Actor#rollTrait`) and an
+    action that rolls a trait (`RollField.prepareConfig` via
+    `DHActionRollData#rollTrait`), which is what makes an attack with a
+    Finesse-and-Agility weapon count. It also catches a Spellcast Roll for a class
+    whose spellcast trait is Agility; that is what the system's own field says and
+    the reading this follows.
+  - **Affordability is not `canAfford`.** A Duality roll's own costs — a Hope per
+    Experience above all — sit unflushed in `config.resourceUpdates` until the
+    workflow ends, so `actor.system.resources.hope.value` still reads the
+    pre-roll number and `canAfford` would sell a 2-Hope reroll the character
+    cannot pay for. `ResourceUpdateMap` extends `Map`, so the pending delta is
+    just `config.resourceUpdates.get("hope")`; `hopeAvailable` adds it (and
+    treats a `clear` entry as zero). **Any feature charging Hope on a roll in
+    flight has this problem** — `modifyResource` clamps on write, so the
+    shortfall is silent.
+  - **The new Hope Die is animated by hand; the message stays suppressed.** The
+    first build called `clearEarlyDice` here, and the table watched the original
+    Hope and Fear land a second time on their old faces before the replacement
+    die appeared. See the `showRerolledDie` bullet under the roll pipeline for
+    why Dice So Nice does that and what replaces it. Gated on whether
+    `showDiceEarly` actually played: if DSN is absent or declined, the message
+    would not have animated either.
+  - **The die is thrown before the Hope is charged**, the opposite order from
+    Adaptability. There the price is an awaited `modifyResource` whose failure
+    has to abort the reroll; here it is an entry in the roll's own pending map
+    that cannot fail on its own, and `rerollHopeDie` *declines* rather than
+    throws when the system's shape has moved — so charging first would be the
+    only way to bill a player for a die that never left the table.
+  - **Prompt only, no chat-card half.** Unlike Adaptability, which reconciles a
+    posted card with `DualityRoll#reroll({liveRoll: true})`, this rewrites the
+    Hope/Fear result itself and the system has no reconciliation for a one-die
+    reroll. So a roll the GM never scored (`config.roll.success === undefined`)
+    raises nothing at all — a real gap in a card whose printed rule has no
+    failure condition, and the obvious next thing to build.
+  - **No use limit**, because the card prints none: the loop re-scores the roll
+    each time and offers again while the Hope lasts. It checks the **flat** 2
+    Hope each round, not a cumulative price — `chargeCosts` has already put the
+    previous spend into the pending map that `hopeAvailable` reads. Adaptability's
+    loop *does* check cumulatively, because `canAfford` ignores that map. Same
+    problem, opposite arithmetic; copying one into the other resells or refuses
+    the same resource.
 - **Fearless** (`src/daggerheart/fearless.ts`) — the Infernis ancestry's "When you
   roll with Fear, you can mark 2 Stress to change it into a roll with Hope
   instead." The SRD ships it as a `feature` Item whose single action only charges
