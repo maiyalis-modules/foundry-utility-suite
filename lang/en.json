@@ -97,6 +97,8 @@
   "EE.Settings.CrimsonRiteEnchant.Hint": "Make the Void's \"Crimson Rite\" feature do what it says. Marking the Hit Point asks which active weapon to enchant (silently, if only one is equipped) and grants that weapon a tier-scaled bonus — 1d4 rising to 4d4 — which the system expires at the character's next rest, short or long. Using the feature again moves the rite rather than stacking it. The enchanted weapon's damage also counts as magic, which is the part the Void's own tier effects never managed on an ordinary physical weapon.",
   "EE.Settings.BloodSpikeSpendHope.Name": "Blood Spike",
   "EE.Settings.BloodSpikeSpendHope.Hint": "Resolve the Void's \"Blood Spike\" card in one press. Either of its attack actions now rolls the die the rule calls for — a d10 once the caster has 3 or more Hit Points marked, a d8 below that — so the d8 and d10 buttons stop being a choice you can get wrong, in either direction. On a hit, the caster is asked whether to spend the Hope: taking it rolls the damage as usual, declining rolls none, and the target marks its Stress either way (that part is already the card's own damage part, applied only to targets that were hit). A miss asks nothing. The card's separate \"Spend Hope\" action is left alone, as the manual route for a cast resolved without a target.",
+  "EE.Settings.BlightingStrikeDamage.Name": "Blighting Strike",
+  "EE.Settings.BlightingStrikeDamage.Hint": "Repair the shape of the Void's \"Blighting Strike\" card. It ships a Spellcast Roll that rolls no damage plus two separate damage actions, one for Hope and one for Fear, which you had to pick between by hand 2014 and because a standalone damage action has no attack roll behind it, its damage never applied to anyone and a critical never maximised its dice. The card's own dice are moved onto the Spellcast Roll as a result-based damage part, d6+1 on a Hope result and d10+1 on a Fear one, and the two loose damage actions are removed. The system then rolls, scores and applies the whole card in one press. Nothing is written to the card 2014 switch this off and it goes back exactly as it shipped. The card's \"reduced by half\" rider is automated too: a hit marks the target with a visible effect, and the next damage that creature deals to a Friendly token is halved, which clears the mark.",
   "EE.Settings.HoldThemOffExtraTargets.Name": "Hold Them Off",
   "EE.Settings.HoldThemOffExtraTargets.Hint": "Let a Ranger holding \"Hold Them Off\" use it: after a successful attack with a weapon, offer to spend 3 Hope and pick up to two more adversaries within the attack's range. Whoever is picked is added to the attack itself before the chat card is posted, so the one roll and the one damage roll resolve against all of them at once — hit or miss decided per adversary against their own Difficulty, exactly as if they had been targeted before the swing. The picker lists only adversaries the player can see and whose distance can be measured; it never shows anyone's Difficulty. Needs the attacker on the scene — a range that can't be measured raises no prompt, and neither does an unarmed strike or a Ranger below 3 Hope.",
   "EE.Settings.RangersFocusTracking.Name": "Ranger's Focus",
@@ -212,12 +214,16 @@
   "EE.Features.CrimsonRite.NoWeapon": "Crimson Rite needs an equipped weapon to enchant, and you have none.",
   "EE.Features.CrimsonRite.Unequipped": "Crimson Rite ended — the weapon it enchanted is no longer equipped in that slot.",
 
+  "EE.Features.BlightingStrike.MarkName": "Blighted by {source}",
+  "EE.Features.BlightingStrike.MarkDescription": "The next time this creature deals damage to a friendly target, that damage is reduced by half. Removed automatically when it happens.",
+
   "EE.Features.BloodSpike.Title": "Blood Spike",
   "EE.Features.BloodSpike.Intro": "Blood Spike hit {targets}.",
   "EE.Features.BloodSpike.Label": "Spend a Hope",
   "EE.Features.BloodSpike.Hint": "Deal the spike's magic damage, rolling {die}. Decline and it deals none — the target marks its Stress either way.",
   "EE.Features.BloodSpike.HintEscalated": "Deal the spike's magic damage. You have {marks} Hit Points marked, so the die is {die}. Decline and it deals none — the target marks its Stress either way.",
   "EE.Features.BloodSpike.NoHope": "Blood Spike hit, but you have no Hope to spend — the target marks a Stress and takes no damage.",
+
 
   "EE.Features.HoldThemOff.Title": "Hold Them Off",
   "EE.Features.HoldThemOff.Intro": "Your {weapon} hit {targets}. Spend {hope} Hope to catch up to two more adversaries within {range} with the same roll.",

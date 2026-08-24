@@ -839,6 +839,83 @@ loads).
   - Costs go into `config.resourceUpdates` (see `duality-outcome.ts`), not a
     direct write: the roll is about to queue its own +1 Hope into the same map,
     and on a Hope result the two correctly cancel to a single net-zero write.
+- **Blighting Strike** (`src/daggerheart/blighting-strike.ts`) — the Dread
+  domain's (*Void for Daggerheart*) "Make a Spellcast Roll against a target
+  within Far range. On a success, the target takes d6+1 magic damage using your
+  Proficiency … If you succeed with Fear, the target instead takes d10+1 magic
+  damage using your Proficiency."
+  `Compendium.the-void-unofficial.domains.Item.BIze56vTneG5UJv6`. World setting
+  `blightingStrikeDamage`, **on** by default, under **Domains → Dread** in
+  `daggerheartAutomationMenu`. **Not a workflow feature at all — it repairs the
+  card's shape at preparation time and then gets out of the way.**
+  - **The card ships wrong, and the system already has the right mechanic.**
+    `DHResourceData.resultBased` makes `DamageField.getFormulaValue` return a
+    damage part's `valueAlt` instead of its `value` when
+    `data.roll.result.duality === -1` (and `data` there is the workflow *config*,
+    despite the parameter name — `formatFormulas` is called with it). The Void
+    instead ships an `attack` with `damage.main: null` and two loose `damage`
+    actions, "Damage (Hope)" (d6+1) and "Damage (Fear)" (d10+1).
+  - **Three costs of the split, all of them real** — and the reason chaining the
+    second action from `postUseAction` was tried first and abandoned:
+    1. A `damage` action has no roll, so `TargetField.execute` leaves every
+       target's `hitResult.success` false and `DamageField.applyDamage`
+       (`targets.filter(t => t.hitResult?.success)`) filters them all out. **The
+       damage never applied to anybody.**
+    2. `DamageField.execute` reads `isCritical` off the *action's own* chat
+       message (`Boolean(message?.system.roll?.isCritical)`). A standalone damage
+       action has none, so **a critical Spellcast rolled ordinary dice.**
+    3. Everything watching the action workflow — the spotlight tracker,
+       Ginzzzu's raised portraits — saw the turn end when the Spellcast Roll
+       ended, because as far as the system was concerned it had.
+  - **The repair**: at `Item#prepareEmbeddedDocuments`, the Spellcast Roll is
+    rebuilt with `damage.main` = the Hope action's part, `resultBased: true`, and
+    `valueAlt` = the Fear action's `value`; the two damage actions are deleted
+    from the prepared collection. The dice are **read off the card**, never
+    written here, so a retuned card keeps its own numbers.
+  - Built through `attack.constructor` rather than a class off `game.system.api`,
+    so it stays whatever subclass the system made it, and from `attack.toObject()`
+    so the constructor gets a source object it is guaranteed to accept.
+    `prepareData()` is called by hand — the system's own loop over the collection
+    has already run by the time this replaces an entry in it.
+  - **`system.actions` is not rebuilt from source on each preparation** — the
+    system's `prepareEmbeddedDocuments` re-prepares the actions already in the
+    collection. So the reshape happens once and subsequent preparations find
+    nothing to do, **and a deleted action does not come back on its own**. That is
+    why `reconcileBlightingStrikeCards` calls `item.reset()` (re-initialise from
+    `_source`) rather than `prepareData()`, unlike the other four users of this
+    seam, which only ever *add* an action.
+  - **A card whose damage actions charge resources is left alone.** Folding `main`
+    across is one field; folding a resource collection across is not, and dropping
+    a cost the card charges silently would be worse than leaving it as it shipped.
+  - Side effect worth knowing: one action means `DhpItem#use` no longer opens
+    `ActionSelectionDialog`, so a hotbar press just casts. An earlier
+    `card-action-choice.ts` existed to force that and was deleted when this
+    stopped needing it.
+  - **The "reduced by half" rider is automated**, and is the only part of the card
+    that is — nothing declares it, so nothing native can carry it. Two halves:
+    1. **The mark.** On a hit, `daggerheart.postUseAction` reads `target.hit` and
+       asks `gm-effects.ts` for a `blightingStrike` marker on each one, relayed to
+       the GM because a player cannot write an ActiveEffect to an adversary. The
+       effect **is** the record — unlike Ranger's Focus, whose marker is cosmetic
+       and whose real record lives on the ranger, the thing that has to remember
+       here is the blighted creature, whose next damage roll happens on the GM's
+       client possibly turns later.
+    2. **The halving.** A `before` rule on `damage-landing.ts`.
+  - **`daggerheart.preTakeDamage` is a trap for anything about the attacker.**
+    `Actor#parseDamageArgs` reduces the payload to `{ main, resourceUpdates }` and
+    discards everything else, so the hook never learns who dealt the damage.
+    `applyDamage` is the seam that knows all three of attacker
+    (`config.source.actor`), targets, and the still-changeable packet.
+  - **"An ally" is Friendly token disposition** (the table's choice), resolved
+    through the same token lookup `applyDamage` does two lines later — scene token
+    when the target entry names one, `actor.prototypeToken` otherwise.
+  - Only `damage.main` is halved, with `Math.ceil`, matching
+    `Actor#calculateDamage`'s `Math.ceil(baseDamage / 2)` for resistance. A damage
+    roll's resource entries are costs, not damage. The mark is cleared **in the
+    `before` phase**, not after: clearing on the way out would leave it standing
+    if application threw.
+  - The mark never expires on its own. The card says "the next time" with no
+    limit, so that is faithful; deleting the effect is one click.
 - **I See It Coming** (`src/daggerheart/i-see-it-coming.ts`) — the Bone domain's
   (SRD) "When you're targeted by an attack made from beyond Melee range, you can
   mark a Stress to roll a d4 and gain a bonus to your Evasion equal to the result
@@ -1035,18 +1112,15 @@ loads).
     a spent Hit Point. Both hooks are synchronous, and `false` from either
     cancels the action — load-bearing in the first, a hazard in the second, where
     every path (including the `catch`) must return `undefined`.
-  - **The Stress wraps `DamageField.applyDamage`**, which is the exact moment
-    damage lands and is shared by the workflow (order 75) and the chat card's
-    *Apply* button. Two cheaper seams were rejected and should stay rejected:
-    declaring a `stress` resource on the damage applies it to **every** hit
-    target (`applyDamage` clones the damage per target but not its resources, so
-    a Hold Them Off swing would mark all three), and the damage *roll's* seam is
-    before anything is applied, so a table with apply-automation off would mark
-    Stress for damage nobody took. The wrapper asks the system's own
-    `getApplyAutomation()` rather than re-deriving the rule. Patched at **setup**,
-    not `init` — the class comes off `game.system.api`, which the system only
-    fills inside its own `init`, and `Action#defineWorkflow` binds `applyDamage`
-    lazily on first *use*, so setup is early enough.
+  - **The Stress rides the shared `applyDamage` seam** (`damage-landing.ts`) as an
+    `after` rule — the exact moment damage lands, shared by the workflow (order
+    75) and the chat card's *Apply* button. This file used to own that wrapper;
+    it was extracted when Blighting Strike became the second consumer. Two cheaper
+    seams were rejected and should stay rejected: declaring a `stress` resource on
+    the damage applies it to **every** hit target (`applyDamage` clones the damage
+    per target but not its resources, so a Hold Them Off swing would mark all
+    three), and the damage *roll's* seam is before anything is applied, so a table
+    with apply-automation off would mark Stress for damage nobody took.
   - **Rerolling a Duality roll needs the dice presets carried over by hand.**
     `DualityRoll.buildPost` stamps them onto `roll.dice[0..2]` *before* calling
     `super.buildPost` (where the window runs), so a roll rebuilt with
@@ -1675,6 +1749,26 @@ loads).
   Installed from `module.ts` at **setup** (`game.system.api` is only filled in the
   system's own `init`); rules are registered by features during `init`, so order
   between them doesn't matter.
+- **Damage landing** (`src/daggerheart/damage-landing.ts`) — the single wrapper
+  around `DamageField.applyDamage` behind every rule that fires when damage lands.
+  Features register with `onDamageLanding({ id, before, after })`. Extracted from
+  `rangers-focus.ts` when Blighting Strike became the second consumer — same
+  one-patch-many-rules reasoning as **Card targeting**.
+  - **Why this method**: it is the one moment damage is really dealt. The workflow
+    calls it at order 75 and the chat card's *Apply* button calls the same entry
+    (`workflow.get('applyDamage')`), so one seam covers the automated and the
+    by-hand route, and a table with apply-automation off never fires a rule for
+    damage nobody took.
+  - **Two phases.** `before` runs with the packet still in hand and may change
+    `config.damage` — the system's own `damageOnSave` scaling mutates it in the
+    same place, so this is supported rather than a trick. `after` runs once the
+    system has applied.
+  - Both get `applying`, computed from the system's own answer
+    (`force || getApplyAutomation()`) rather than a copy of the rule.
+  - `damagedTargets(config, targets)` is exported because it is the same default
+    `applyDamage` itself applies (`targets ?? config.targets.filter(t =>
+    t.hitResult?.success)`), so a rule and the system can never disagree about who
+    was damaged.
 - **GM action-effect relay** (`src/daggerheart/gm-action-effects.ts`) — fills the
   Daggerheart system's permission gap when a player's action applies an embedded
   ActiveEffect to an adversary. Its `EffectsField.applyEffect` calls core's

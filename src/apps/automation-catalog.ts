@@ -401,7 +401,23 @@ const DOMAINS: Catalog = {
         },
       ],
     },
-    fromVoid("Dread"),
+    {
+      id: "dread",
+      label: "Dread",
+      fromVoid: true,
+      groups: [
+        {
+          legend: "EE.Automation.DomainCardsLegend",
+          settings: [
+            {
+              key: SETTINGS.blightingStrikeDamage,
+              name: "EE.Settings.BlightingStrikeDamage.Name",
+              hint: "EE.Settings.BlightingStrikeDamage.Hint",
+            },
+          ],
+        },
+      ],
+    },
   ],
 };
 

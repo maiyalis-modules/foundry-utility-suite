@@ -13,6 +13,8 @@ import { registerAdaptability } from "./daggerheart/adaptability.js";
 import { registerAdversaryAttack } from "./daggerheart/adversary-attack.js";
 import { registerAttackOfOpportunity } from "./daggerheart/attack-of-opportunity.js";
 import { registerBloodMaledict } from "./daggerheart/blood-maledict.js";
+import { registerBlightingStrike } from "./daggerheart/blighting-strike.js";
+import { registerDamageLanding } from "./daggerheart/damage-landing.js";
 import { registerBloodSpike } from "./daggerheart/blood-spike.js";
 import { registerCardTargeting } from "./daggerheart/card-targeting.js";
 import { registerCloseKnit } from "./daggerheart/close-knit.js";
@@ -145,6 +147,13 @@ Hooks.once("init", async () => {
   // standing ActiveEffect, so it hooks the system directly and takes no part in
   // the pipeline's ordering.
   registerCrimsonRite();
+  // Not a roll window at all: it repairs the card's own shape at preparation time
+  // so the system resolves it natively, and takes no part in any ordering here.
+  registerBlightingStrike();
+  // The single wrapper behind every rule that fires when damage lands. After the
+  // features, so every rule they register is already listed \x{2014} though the patch
+  // itself waits for `setup`, so the order is only tidiness.
+  registerDamageLanding();
   // The single wrapper behind every card that declares a target it must not ask
   // for. After the features, so every rule they register is already listed —
   // though the patch itself waits for `setup`, so the order is only tidiness.

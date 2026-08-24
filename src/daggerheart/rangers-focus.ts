@@ -103,6 +103,7 @@
  */
 import { FLAGS, LOG_PREFIX, MODULE_ID, SETTINGS } from "../constants.js";
 import { escapeHtml } from "../utils/escape-html.js";
+import { damagedTargets, onDamageLanding } from "./damage-landing.js";
 import { chooseOne, confirmChoice, type PromptParty } from "./feature-prompt.js";
 import { markActor, unmarkActor, type MarkRequest } from "./gm-effects.js";
 import { findGrantingItem, resourceUpdatesFor, type FeatureMatch } from "./feature-registry.js";
@@ -713,10 +714,12 @@ async function chooseWeapon(weapons: EquippedAttack[]): Promise<EquippedAttack |
 /**
  * "When you deal damage to them, they must mark a Stress."
  *
- * Wraps the system's `DamageField.applyDamage`, which is the one moment damage
- * actually lands: the action workflow calls it at order 75, and the chat card's
- * *Apply* button calls the very same entry (`workflow.get('applyDamage')`), so
- * one wrapper covers both the automated and the by-hand route.
+ * Registered on the shared `applyDamage` seam in `damage-landing.ts`, which is
+ * the one moment damage actually lands: the action workflow calls it at order 75,
+ * and the chat card's *Apply* button calls the very same entry
+ * (`workflow.get('applyDamage')`), so one seam covers both the automated and the
+ * by-hand route. An `after` rule, because this reacts to damage having been dealt
+ * rather than changing it.
  *
  * ## Why not somewhere cheaper
  *
@@ -734,50 +737,14 @@ async function chooseWeapon(weapons: EquippedAttack[]): Promise<EquippedAttack |
  * `emitGMUpdate` relay, so a player marking Stress on an adversary is applied by
  * the GM's client. That is also why this is the only benefit that touches the
  * target at all — see the header on where the Focus is kept.
- *
- * Patched at `setup` rather than `init`: the class is read off `game.system.api`,
- * which the system only fills inside its own `init`. That is early enough —
- * `Action#defineWorkflow` binds `applyDamage` lazily, the first time an action's
- * `workflow` is *used*, which is never before a roll.
  */
 function registerFocusStress(): void {
-  Hooks.once("setup", () => {
-    const damageField = game.system?.api?.fields?.ActionFields?.DamageField as
-      | AnyObject
-      | undefined;
-    const original = damageField?.["applyDamage"];
-
-    if (typeof original !== "function") {
-      console.warn(`${LOG_PREFIX} ${LABEL}: no applyDamage to wrap — the Stress is off.`);
-      return;
-    }
-
-    damageField!["applyDamage"] = async function (
-      this: AnyObject,
-      config: AnyObject,
-      targets: AnyObject[] | null = null,
-      force = false,
-    ): Promise<unknown> {
-      // Asked before the original runs, using the system's own answer rather than
-      // a copy of the rule: `applyDamage` returns without doing anything when
-      // apply-automation is off and nothing forced it, and no damage dealt means
-      // no Stress marked.
-      const applying = force === true || damageField!["getApplyAutomation"]?.() === true;
-
-      const result = await original.call(this, config, targets, force);
-
-      if (applying) {
-        try {
-          await markFocusStress(config, targets);
-        } catch (error) {
-          // The damage has landed either way; a broken benefit must not take the
-          // whole application down with it.
-          console.warn(`${LOG_PREFIX} ${LABEL}: could not mark the Focus's Stress.`, error);
-        }
-      }
-
-      return result;
-    };
+  onDamageLanding({
+    id: FEATURE_ID,
+    after: async (config, targets, applying) => {
+      if (!applying) return;
+      await markFocusStress(config, targets);
+    },
   });
 }
 
@@ -794,13 +761,7 @@ async function markFocusStress(config: AnyObject, targets: AnyObject[] | null): 
   const focus = focusOn(ranger);
   if (!focus) return;
 
-  // The same default `applyDamage` itself applies, so the two can never disagree
-  // about who was damaged.
-  const damaged =
-    targets ??
-    ((config["targets"] ?? []) as AnyObject[]).filter(
-      (target) => target["hitResult"]?.["success"] === true,
-    );
+  const damaged = damagedTargets(config, targets);
   if (!damaged.some((target) => String(target["actorId"] ?? "") === focus.mark.actorUuid)) return;
 
   const focusActor = fromUuidSync(focus.mark.actorUuid);

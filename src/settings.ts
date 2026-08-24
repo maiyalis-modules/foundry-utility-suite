@@ -24,6 +24,7 @@ import { GeneralFeaturesConfig } from "./apps/general-features-config.js";
 import { SessionLogConfig } from "./apps/session-log-config.js";
 import { MENUS, MODULE_ID, SETTINGS } from "./constants.js";
 import { reconcileOpportunityCards } from "./daggerheart/attack-of-opportunity.js";
+import { reconcileBlightingStrikeCards } from "./daggerheart/blighting-strike.js";
 import { reconcileCloseKnitCards } from "./daggerheart/close-knit.js";
 import { reconcileCompanionCards } from "./daggerheart/companion.js";
 import { DECK_CARD_TYPES, DEFAULT_DECK_LIMIT } from "./daggerheart/deck-limit.js";
@@ -288,6 +289,20 @@ export function registerSettings(): void {
     config: false,
     type: Boolean,
     default: true,
+  });
+
+  // World-scoped like the rest, and this one has to be: it changes the shape of a
+  // card every client prepares, so two clients disagreeing would have them rolling
+  // different actions off the same item. Reconciled on change, because the reshape
+  // removes actions from prepared data and nothing re-prepares an open sheet.
+  game.settings.register(MODULE_ID, SETTINGS.blightingStrikeDamage, {
+    name: "EE.Settings.BlightingStrikeDamage.Name",
+    hint: "EE.Settings.BlightingStrikeDamage.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+    onChange: () => reconcileBlightingStrikeCards(),
   });
 
   // World-scoped for the same reason as Blood Maledict, whose window this shares:

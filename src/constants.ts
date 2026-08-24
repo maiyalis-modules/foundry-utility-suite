@@ -179,6 +179,18 @@ export const SETTINGS = {
    */
   bloodSpikeSpendHope: "bloodSpikeSpendHope",
   /**
+   * Master switch for automating **Blighting Strike** (Dread domain, *Void for
+   * Daggerheart*): after a successful cast, press the card's own damage action
+   * that the Hope/Fear result calls for — d6+1 with Hope, d10+1 with Fear. See
+   * `daggerheart/blighting-strike.ts`.
+   *
+   * World-scoped and **on** by default, for the same reasons as
+   * {@link SETTINGS.fearlessFearToHope}. The Spellcast Roll itself is untouched,
+   * and the card keeps both damage buttons as the manual route — so switching
+   * this off leaves the card exactly as the Void ships it.
+   */
+  blightingStrikeDamage: "blightingStrikeDamage",
+  /**
    * Master switch for automating **I See It Coming** (Bone domain): when an
    * attack from beyond Melee range lands on the character, offer to mark a Stress,
    * roll a d4 and add it to their Evasion against that attack — before the chat
@@ -528,6 +540,18 @@ export const FLAGS = {
    * Purely a label: the authoritative record is always the ranger's own effect.
    */
   rangersFocusTarget: "rangersFocusTarget",
+  /**
+   * The Blighting Strike mark on a creature the strike hit: `{ sourceUuid }`,
+   * naming the caster.
+   *
+   * Its presence *is* the rule — "the next time the target deals damage to an
+   * ally, it is reduced by half" — so unlike the Ranger's Focus label there is no
+   * second, authoritative record anywhere. Halving the damage removes it.
+   *
+   * Written by the GM's client on request (see `daggerheart/gm-effects.ts`),
+   * because the strike is cast by a player at an adversary they cannot write to.
+   */
+  blightingStrikeMark: "blightingStrikeMark",
   /**
    * Marks an ActiveEffect as one **Gifted Tracker** tracking, and records what is
    * being tracked: `{ description, hope, quarry: [{ uuid, name, img }] }`.
