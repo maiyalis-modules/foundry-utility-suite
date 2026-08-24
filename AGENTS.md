@@ -1470,6 +1470,93 @@ loads).
     `DamageField.getFormulaValue` reads `config.roll.result.duality` and there is
     no roll on the damage config — passing the *reaction* roll's would mean handing
     the damage card a half-formed roll to render.
+- **Slayer** (`src/daggerheart/slayer.ts`) — the Call of the Slayer subclass
+  foundation feature's pool of d6s
+  (`Compendium.daggerheart.subclasses.Item.1hF5KGKQc2VKT5O8`, a `feature` Item the
+  SRD ships as description only). Four separate rules on one card, and every one
+  of them attaches somewhere different.
+  - **The pool lives in the system's own `system.resource`** — a `simple`
+    resource with `increasing` progression and `session` recovery. That is what
+    puts a counter with a number box on the card's row in the character sheet's
+    Features tab (`item-resource.hbs`, reached through `daggerheart.inventory-items`),
+    so "place a d6 on this card" is a thing the player can see and correct by hand.
+  - **`resource.max` is a literal number, not `@prof`.** The formula is what the
+    two places in the system that *reset* a resource use, but `item-resource.hbs`
+    resolves the same field through `itemAbleRollParse(max, item.actor, item)` —
+    whose third argument being an Item makes it resolve against the *item's* roll
+    data, where `@prof` does not exist. `reconcileSlayerCards` keeps the literal
+    in step with a level-up instead, and every rule in the file reads
+    `actor.system.proficiency` live rather than the stored figure.
+  - **The configuration is written to the card, not derived at preparation time**
+    — the one card feature in this module that is. `resource` is a nullable
+    `SchemaField` with a `required` member (`progression`), and
+    `SchemaField#_updateDiff` validates a nullish field's first write *whole*
+    (`const wasNullish = !state.source[key]` → `partial: !wasNullish`), so
+    `item.update({"system.resource.value": 1})` against a card that has never held
+    one is rejected for the fields it does not mention. A derived object would
+    render the sheet's number box over exactly that condition. `writePool`
+    therefore always writes the object whole; `reconcileSlayerCards` (writer-gated,
+    at `ready` and on the setting) puts it there in the first place.
+  - **Taking the die instead of the Hope is a registry feature on the**
+    **`dualityOutcome` window**, so it rides in the same prompt as Fearless and
+    anything else reacting to that roll. Priority 60 — reactive, not rewriting.
+  - **It declares no `cost`.** A `hope` cost would make `canAfford` read "the actor
+    must already hold one", and a character at 0 Hope rolling with Hope is exactly
+    the one most likely to want the die. `apply` calls `context.payCost` itself, so
+    the `-1` folds into the roll's own pending update and the system's `+1` nets
+    against it: one actor write, and no moment where the player holds a Hope they
+    declined.
+  - **It names its own buttons.** `AutomatedFeature.useLabelKey`/`skipLabelKey`
+    (localized by `toPromptOffers` into `PromptOffer.useLabel`/`skipLabel`)
+    replace the generic "Use it" / "Leave the roll alone" pair with "Gain a Slayer
+    Die" / "Gain a Hope". The generic wording is wrong here in a way it is not for
+    Fearless: *both* buttons take something, and declining is not leaving the roll
+    alone. Honoured **only when the feature is the sole offer** — with several on
+    screen the buttons act on all of them at once, so one feature's wording would
+    say something untrue about the others, and `chooseOffers` falls back. A feature
+    sets them regardless, since it cannot know whether it will be alone.
+  - **`hopeGain` mirrors `addDualityResourceUpdates` condition for condition** —
+    automation switch, `actionType !== "reaction"`, `skips.resources`, the
+    dead/defeated/unconscious statuses, and the rerolled-roll delta. Because the
+    offer *nets against* what that method queues, a missed condition would not fail
+    loudly; it would quietly take a Hope that was never granted.
+  - **Damage spending needs no UI of its own.** `DamageRoll.temporaryModifierBuilder`
+    builds `config.modifiers`, which the damage dialog renders as a labelled
+    `<select>` per entry (`values`) and `constructFormula` applies through each
+    entry's `callback` — the mechanism behind Bardic Rally and the weapon features.
+    The wrap has to run **after** the original, which *assigns* `config.modifiers`.
+    The entry's `label` is an i18n key, because the template does `{{localize label}}`.
+  - **Attack spending is one injected row plus a wrapped `applyBaseBonus`.** The D20
+    dialog has no modifier mechanism, only the player's own situational-bonus box,
+    so `renderD20RollDialog` appends a `<span>` + `<select>` to `.modifier-container`
+    in the same shape as the trait row. Going through `D20Roll#applyBaseBonus` rather
+    than pushing terms buys the live formula preview (the dialog re-derives it every
+    render) and a labelled entry in the attribution; `formatModifier` parses a
+    non-numeric value as a formula, so `"2d6"` arrives as real dice. Patched on
+    `D20Roll`, whose `DualityRoll` override calls `super`, so one patch covers both.
+  - **The dice come off the card at `buildPost`, not in either dialog** — a
+    cancelled dialog costs nothing. `DamageField.execute` builds the damage config
+    as `{dialog: {}, ...config}`, so the attack's chosen count travels to the damage
+    roll behind it; the two halves therefore carry **independent** "already taken"
+    markers (`config.eeSlayerSpent` and `modifiers.eeSlayerDice.eeSpent`), and the
+    attack's marker travels with its count. The count itself is never cleared, so a
+    `DualityRoll#reroll` still carries the dice it was rolled with.
+  - **End of session is the sidebar tab's refresh button.** The system has no
+    "end session" event; the only thing that ends one mechanically is the
+    **Daggerheart** sidebar tab with *Session* ticked, calling the unexported
+    `RefreshFeatures`. What is reachable is `CONFIG.ui.daggerheartMenu` and the
+    handler it names in `DEFAULT_OPTIONS.actions.refreshActors`, which ApplicationV2
+    copies into an instance's options at construction — so wrapping it at `init`,
+    before the sidebar is built, puts the Hope payout in front of the refresh. The
+    card keeps declaring `session` recovery anyway: we zero the pools first, so the
+    system's own sweep is a no-op, and the card still describes itself correctly.
+  - **Not automated:** a critical damage roll **maximises spent Slayer Dice too** —
+    `constructFormula` sums `formulaData.roll.dice` for the critical bonus after
+    *both* modifier passes, so any die added to a damage roll is counted, exactly as
+    for a Bardic Rally die, and there is no seam that adds dice after that sum; a
+    Fear result another feature converts to Hope does not offer the die, because
+    `offersFor` builds the whole prompt before any of it applies; and which dice were
+    spent on what, since the card tracks a count rather than identities.
 - **Card targeting** (`src/daggerheart/card-targeting.ts`) — the single wrapper
   around `DHBaseAction#use` behind every card that declares a target it must not
   ask for. Features register a predicate with `untargetAction(rule)`; the patch
@@ -1719,10 +1806,11 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Crimson Rite and Hybrid Form under Blood Hunter; Hold Them Off, Ranger's
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
-    Tracker under Sage, Not Good Enough under Blade, Attack of Opportunity under
-    Warrior). A subclass has no home of
+    Tracker under Sage, Not Good Enough under Blade, Attack of Opportunity and
+    Slayer under Warrior). A subclass has no home of
     its own, so its rules are filed under its parent class in a group of their own — Hybrid Form under
-    Blood Hunter, Beastbound under Ranger. All four
+    Blood Hunter, Beastbound under Ranger, Slayer (Call of the Slayer) under
+    Warrior. All four
     content tabs render
     the *same* template from data in `src/apps/automation-catalog.ts`, so adding a
     switch is one `CatalogSetting` in the right entry's `groups`. `settingKeys` is

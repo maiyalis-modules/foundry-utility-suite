@@ -28,6 +28,7 @@ import { registerGmEffects } from "./daggerheart/gm-effects.js";
 import { registerNotGoodEnough } from "./daggerheart/not-good-enough.js";
 import { registerRangersFocus } from "./daggerheart/rangers-focus.js";
 import { registerReach } from "./daggerheart/reach.js";
+import { reconcileSlayerCards, registerSlayer } from "./daggerheart/slayer.js";
 import { installRollPipeline } from "./daggerheart/roll-pipeline.js";
 import { registerHotbarPages } from "./hotbar/hotbar-pages.js";
 import { registerGinzzzuPortraits } from "./integrations/ginzzzu-portraits.js";
@@ -122,6 +123,12 @@ Hooks.once("init", async () => {
   // nothing else is looking at what it changes and its place in this list costs
   // nothing. It has to be registered before `installRollPipeline` all the same.
   registerNotGoodEnough();
+  // Four separate rules on one card, and none of them is a reaction window: it
+  // hooks the duality window through the registry, patches two of the system's
+  // roll classes, and installs one roll window of its own. Before
+  // `installRollPipeline` for that last reason; its place in the window order
+  // costs nothing, since it changes no roll and only takes dice off a card.
+  registerSlayer();
   installRollPipeline();
   // Not a roll window: Crimson Rite is activated by an action and delivered as a
   // standing ActiveEffect, so it hooks the system directly and takes no part in
@@ -144,4 +151,7 @@ Hooks.once("ready", () => {
   // No wizard of ours can be open this early, so any Deck Limit hold still on
   // this user is left over from a crash or a mid-wizard reload.
   void releaseOwnHolds();
+  // The Slayer card's dice pool is stored on the card, so somebody has to put it
+  // there. Only the active GM's client actually writes; see `reconcileSlayerCards`.
+  void reconcileSlayerCards();
 });

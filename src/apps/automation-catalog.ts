@@ -241,6 +241,19 @@ const CLASSES: Catalog = {
             },
           ],
         },
+        {
+          // Slayer is the Call of the Slayer subclass's, and a subclass has
+          // nowhere of its own here — same treatment as Hybrid Form under Blood
+          // Hunter and Beastbound under Ranger.
+          legend: "EE.Automation.CallOfTheSlayerLegend",
+          settings: [
+            {
+              key: SETTINGS.slayerDice,
+              name: "EE.Settings.SlayerDice.Name",
+              hint: "EE.Settings.SlayerDice.Hint",
+            },
+          ],
+        },
       ],
     },
     plain("Wizard"),

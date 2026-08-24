@@ -107,6 +107,18 @@ export interface AutomatedFeature<C extends FeatureContextBase = FeatureContextB
   labelKey: string;
   /** i18n key for the explanatory line under it. */
   hintKey?: string;
+  /**
+   * i18n keys naming the two outcomes, for a feature where "use it" / "leave the
+   * roll alone" is a worse description than saying what each button gets you —
+   * Slayer's "Gain a Slayer Die" against "Gain a Hope", where *both* buttons take
+   * something and neither is the null answer.
+   *
+   * Honoured only when this feature is the sole offer on the prompt; see
+   * {@link PromptOffer.useLabel}. Set them anyway — a feature cannot know in
+   * advance whether it will be alone on the roll.
+   */
+  useLabelKey?: string;
+  skipLabelKey?: string;
   /** What using it costs. An offer is withheld when the actor cannot pay. */
   cost?: readonly FeatureCost[];
   /** The setting gate. Checked per event, so toggling a feature is live. */

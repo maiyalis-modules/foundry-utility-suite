@@ -262,6 +262,23 @@ export const SETTINGS = {
    */
   attackOfOpportunity: "attackOfOpportunity",
   /**
+   * Master switch for automating **Slayer** (Call of the Slayer, the Warrior
+   * subclass): the pool of d6s the card stores. Puts a counter on the card, offers
+   * the die in place of the Hope on every roll with Hope while there is room for
+   * one, adds a "Slayer Dice" dropdown to the attack and damage dialogs that rolls
+   * the spent dice into the total, and converts whatever is left into Hope when
+   * the GM ends the session. See `daggerheart/slayer.ts`.
+   *
+   * World-scoped and **on** by default, like the rest of the feature switches —
+   * and this one has to be, since the counter it puts on the card is stored data
+   * every client reads rather than a per-user view of it.
+   *
+   * Switching it off stops all four halves but deliberately **leaves any dice
+   * already on a card alone**: they are the player's, and turning the automation
+   * off should stop the module acting on them rather than confiscate them.
+   */
+  slayerDice: "slayerDice",
+  /**
    * Master switch for automating **Not Good Enough** (Blade domain): after a
    * character holding the card rolls damage, offer to reroll every damage die
    * that came up 1 or 2 — before the result reaches the chat card, so the table

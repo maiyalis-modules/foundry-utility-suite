@@ -54,6 +54,18 @@ export interface PromptOffer {
   hint?: string;
   /** The granting Item's name, so the player can see which card this came from. */
   itemName: string;
+  /**
+   * Localized replacements for the two buttons, for a feature whose choice reads
+   * better as two named outcomes than as "use it" / "don't".
+   *
+   * Honoured **only when this is the sole offer** — with several on screen the
+   * buttons act on all of them at once, and borrowing one feature's wording for
+   * that would say something untrue about the others. {@link chooseOffers} falls
+   * back to the generic pair in that case, so a feature may set these without
+   * having to know whether it will be alone.
+   */
+  useLabel?: string;
+  skipLabel?: string;
 }
 
 /** One side of a {@link PromptHeadline} — who did it, or who it was done to. */
@@ -248,10 +260,15 @@ export async function chooseOffers(request: PromptRequest): Promise<Set<string>>
       buttons: [
         {
           action: "use",
-          label: game.i18n.localize("EE.Features.PromptUse"),
+          // A feature may name the two outcomes itself — see `PromptOffer.useLabel`.
+          // Only reachable here, where there is exactly one thing being decided.
+          label: only.useLabel || game.i18n.localize("EE.Features.PromptUse"),
           default: true,
         },
-        { action: "skip", label: game.i18n.localize("EE.Features.PromptSkip") },
+        {
+          action: "skip",
+          label: only.skipLabel || game.i18n.localize("EE.Features.PromptSkip"),
+        },
       ],
     });
 

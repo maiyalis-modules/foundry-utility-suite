@@ -28,6 +28,7 @@ import { reconcileCloseKnitCards } from "./daggerheart/close-knit.js";
 import { reconcileCompanionCards } from "./daggerheart/companion.js";
 import { DECK_CARD_TYPES, DEFAULT_DECK_LIMIT } from "./daggerheart/deck-limit.js";
 import { reconcileReach } from "./daggerheart/reach.js";
+import { reconcileSlayerCards } from "./daggerheart/slayer.js";
 import { HotbarPagesConfig } from "./hotbar/hotbar-pages-app.js";
 import { DEFAULT_CONFIG, refreshHotbarPage } from "./hotbar/hotbar-pages.js";
 import { reconcileHybridFormPortraits } from "./integrations/void-hybrid-form.js";
@@ -369,6 +370,20 @@ export function registerSettings(): void {
     type: Boolean,
     default: true,
     onChange: () => reconcileOpportunityCards(),
+  });
+
+  // World-scoped because the thing it switches on is *stored* — a counter on the
+  // card that every client reads — rather than a view of it, so there is no
+  // coherent per-user answer. The reconcile puts that counter on any card that
+  // does not have one yet; switching the feature off leaves the dice alone.
+  game.settings.register(MODULE_ID, SETTINGS.slayerDice, {
+    name: "EE.Settings.SlayerDice.Name",
+    hint: "EE.Settings.SlayerDice.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+    onChange: () => void reconcileSlayerCards(),
   });
 
   game.settings.register(MODULE_ID, SETTINGS.notGoodEnoughReroll, {

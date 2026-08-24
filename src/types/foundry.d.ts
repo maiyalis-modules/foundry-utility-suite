@@ -222,6 +222,12 @@ declare global {
     readonly total: number;
     evaluate(options?: AnyObject): Promise<Roll>;
     toMessage(data?: AnyObject, options?: AnyObject): Promise<AnyObject | undefined>;
+    /**
+     * Turn a formula into RollTerms, substituting `@paths` from `data` first.
+     * The terms are unevaluated, which is what makes this the way to *append*
+     * dice to a roll the system is still assembling.
+     */
+    static parse(formula: string, data?: AnyObject): AnyObject[];
   }
 
   /** Chat log entries. Only the members this module touches. */
