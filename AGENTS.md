@@ -1572,6 +1572,27 @@ loads).
   Installed from `module.ts` at **setup** (`game.system.api` is only filled in the
   system's own `init`); rules are registered by features during `init`, so order
   between them doesn't matter.
+- **GM action-effect relay** (`src/daggerheart/gm-action-effects.ts`) — fills the
+  Daggerheart system's permission gap when a player's action applies an embedded
+  ActiveEffect to an adversary. Its `EffectsField.applyEffect` calls core's
+  `ActiveEffect.implementation.create` directly on the acting client, and core
+  requires OWNER of the target; `ActorDelta` in the resulting error only means
+  the token is unlinked, since linked adversaries fail the same ownership test.
+  World setting `relayActionEffects` (on by default), edited in the Daggerheart
+  Utilities window. The wrapper is installed at `setup`, after
+  `game.system.api.fields.ActionFields.EffectsField` exists: owned targets and GM
+  actions call the original method untouched, while an unowned target sends a
+  correlated request to the single `isWriter` GM and waits up to ten seconds for
+  its result. **The socket carries only the source effect UUID and target actor
+  UUID, never ActiveEffect data.** The GM resolves both, requires the source to
+  be an effect embedded in an Item whose actor the requesting active non-GM user
+  owns, requires the target not to be owned by that user, then calls Daggerheart's
+  original method so the system constructs the copied effect itself. Completed
+  request ids are bounded and cached on the GM to prevent a duplicate delivery
+  from applying twice; distinct uses deliberately are not deduplicated, because
+  stacking is the system's rule to decide. This is not a generic
+  `preCreateActiveEffect` relay: accepting arbitrary effect data there would make
+  the module socket a privileged document writer.
 - **Deck Limit** (`src/daggerheart/deck-limit.ts`, settings only so far) — models
   the table's card pool as physical decks: a card in one character's hands isn't
   available to anyone else. World settings `deckLimitEnabled` (off by default)
@@ -1873,6 +1894,23 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
   rows while knowing nothing about our headings — which is why the wrapper hides
   itself via `:not(:has(> .form-group:not([hidden])))` in `styles/module.css`
   rather than any JS trying to race that debounce.
+- **Line endings vary per file — sniff before you write.** About a third of the
+  tracked files are CRLF and the rest LF, and there is no rule that predicts which:
+  `src/constants.ts`, `src/settings.ts`, `lang/en.json`, `styles/module.css` and this
+  file are CRLF, while `src/module.ts` and everything under `src/daggerheart/` is LF.
+  **Match whatever the file you are editing already uses.** Appending LF lines to a
+  CRLF file leaves it mixed, which is easy to do and easy to miss: `core.autocrlf` is
+  `true` here, so git normalizes on commit and `git diff` looks clean — the damage
+  lives only in the working tree, where it surfaces later as whole-file diffs in an
+  editor and `^M` noise for anyone whose git is set up differently. A new file may use
+  either, as long as it is consistent within itself.
+  Detect with `l=$(wc -l < f); c=$(tr -cd '\r' < f | wc -c)` — `c == 0` is LF, `c == l`
+  is CRLF, anything between is mixed. **Never use `cat -A` for this**: the Git Bash
+  build here strips CR before printing and reports every file as LF. List the stray
+  lines with `perl -ne 'print "$.\n" unless /\r\n$/' f` and repair a CRLF file with
+  `perl -i -pe 's/(?<!\r)\n$/\r\n/' f`. Note that `perl -i -pe` substitutions anchored
+  with `^`/`$` behave differently on a CRLF file — `$` sits before the `\r`, not after
+  it — so match `(...\r?\n)` and emit `\r\n` explicitly rather than relying on anchors.
 - **Hand-edited JSON** (`lang/`, `packs/`): save **UTF-8 without a BOM**. Foundry's
   loader chokes on a BOM, and PowerShell's `Set-Content -Encoding utf8` adds one —
   use `[System.IO.File]::WriteAllText(path, text, (New-Object System.Text.UTF8Encoding($false)))`.

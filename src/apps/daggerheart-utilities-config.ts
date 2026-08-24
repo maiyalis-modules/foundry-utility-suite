@@ -32,6 +32,7 @@ export class DaggerheartUtilitiesConfig extends ConfigWindow {
   };
 
   protected override settingKeys = [
+    SETTINGS.relayActionEffects,
     SETTINGS.deckLimitEnabled,
     SETTINGS.deckLimitPlayersOnly,
   ] as const;
@@ -42,6 +43,7 @@ export class DaggerheartUtilitiesConfig extends ConfigWindow {
     const context = (await super._prepareContext?.(options)) ?? {};
     return {
       ...context,
+      relayActionEffects: DaggerheartUtilitiesConfig.flag(SETTINGS.relayActionEffects),
       deckLimitEnabled: DaggerheartUtilitiesConfig.flag(SETTINGS.deckLimitEnabled),
       deckLimitCount: DaggerheartUtilitiesConfig.count(SETTINGS.deckLimitCount, DEFAULT_DECK_LIMIT),
       deckLimitPlayersOnly: DaggerheartUtilitiesConfig.flag(SETTINGS.deckLimitPlayersOnly),

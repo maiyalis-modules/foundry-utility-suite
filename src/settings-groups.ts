@@ -1,5 +1,5 @@
 /**
- * Divider headings between our buttons in Foundry's own Configure Settings list.
+ * Divider headings between our controls in Foundry's own Configure Settings list.
  *
  * A module gets exactly one flat category there — `SettingsConfig` extends
  * `CategoryBrowser`, whose `_categorizeEntry` maps a namespace to a single
@@ -7,42 +7,49 @@
  * second namespace *would* buy a second category, but it would also be a second
  * module id in the sidebar, and every setting under it would be a stranger to
  * `MODULE_ID`. So the grouping is presentational: after core renders its list we
- * head each run of our buttons with core's own `h3.divider`.
+ * head each run of our controls with core's own `h3.divider`.
  *
  * The runs have to be contiguous, which is why `settings.ts` registers menus in
- * this order — the settings list renders them in registration order.
+ * this order — the settings list renders menus before its ordinary settings.
  *
  * Nothing here is load-bearing: if a future core release changes the markup this
  * queries, the buttons still all work, they just come back ungrouped.
  */
-import { LOG_PREFIX, MENUS, MODULE_ID } from "./constants.js";
+import { LOG_PREFIX, MENUS, MODULE_ID, SETTINGS } from "./constants.js";
 
 /**
- * The headings, top to bottom, each naming the menus that fall under it. A menu
- * missing from every group simply stays unheaded where core put it.
+ * The headings, top to bottom, each naming the controls that fall under it. A
+ * control missing from every group simply stays unheaded where core put it.
  */
-const SETTING_GROUPS: readonly { label: string; menus: readonly string[] }[] = [
+const SETTING_GROUPS: readonly { label: string; keys: readonly string[] }[] = [
   {
     label: "EE.SettingsList.GeneralHeading",
-    menus: [MENUS.generalFeaturesMenu, MENUS.hotbarPagesMenu, MENUS.sessionLogMenu],
+    keys: [MENUS.generalFeaturesMenu, MENUS.hotbarPagesMenu, MENUS.sessionLogMenu],
   },
   {
     label: "EE.SettingsList.DaggerheartHeading",
-    menus: [MENUS.daggerheartAutomationMenu, MENUS.daggerheartUtilitiesMenu],
+    keys: [MENUS.daggerheartAutomationMenu, MENUS.daggerheartUtilitiesMenu],
+  },
+  {
+    label: "EE.SettingsList.PlayerDaggerheartHeading",
+    keys: [SETTINGS.notGoodEnoughAlwaysReroll],
   },
 ] as const;
 
 /**
- * The rows for one group, in DOM order. Each menu renders as a `.form-group`
- * wrapping a `button[data-key="<namespace>.<key>"]` (core's
- * `templates/settings/config-category.hbs`), which is the only stable handle on
- * a specific button — the label is localized and the position isn't ours.
+ * The rows for one group, in DOM order. Core renders each as a `.form-group`
+ * wrapping either a menu button with `data-key` or a setting input with `name`
+ * set to its fully-qualified id. The label is localized and the position isn't
+ * ours, so the control is the stable handle for finding its row.
  */
-function rowsFor(section: HTMLElement, menus: readonly string[]): HTMLElement[] {
+function rowsFor(section: HTMLElement, keys: readonly string[]): HTMLElement[] {
   const rows: HTMLElement[] = [];
-  for (const key of menus) {
-    const button = section.querySelector<HTMLElement>(`button[data-key='${MODULE_ID}.${key}']`);
-    const row = button?.closest<HTMLElement>(".form-group");
+  for (const key of keys) {
+    const id = `${MODULE_ID}.${key}`;
+    const control = section.querySelector<HTMLElement>(
+      `button[data-key='${id}'], input[name='${id}'], select[name='${id}']`,
+    );
+    const row = control?.closest<HTMLElement>(".form-group");
     if (row) rows.push(row);
   }
   return rows;
@@ -68,7 +75,7 @@ export function registerSettingsGroups(): void {
     if (section.querySelector(".ee-settings-group")) return;
 
     for (const group of SETTING_GROUPS) {
-      const rows = rowsFor(section, group.menus);
+      const rows = rowsFor(section, group.keys);
       if (!rows.length) continue;
 
       const wrapper = document.createElement("div");

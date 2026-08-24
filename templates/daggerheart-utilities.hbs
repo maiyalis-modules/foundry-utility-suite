@@ -6,6 +6,19 @@
 <div class="ee-config-body">
 
   <fieldset>
+    <legend>{{localize "EE.Utilities.ActionEffectsLegend"}}</legend>
+
+    <div class="form-group">
+      <label for="ee-relay-action-effects">{{localize "EE.Settings.RelayActionEffects.Name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" id="ee-relay-action-effects" name="relayActionEffects"
+               {{#if relayActionEffects}}checked{{/if}}>
+      </div>
+      <p class="hint">{{localize "EE.Settings.RelayActionEffects.Hint"}}</p>
+    </div>
+  </fieldset>
+
+  <fieldset>
     <legend>{{localize "EE.Utilities.DeckLimitLegend"}}</legend>
 
     <div class="form-group">

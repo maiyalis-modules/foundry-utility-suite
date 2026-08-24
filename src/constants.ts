@@ -350,6 +350,13 @@ export const SETTINGS = {
    */
   deckLimitEnabled: "deckLimitEnabled",
   /**
+   * Let a player's Daggerheart action apply its embedded effects to an actor the
+   * player does not own by asking the active GM to perform the copy. This is
+   * intentionally scoped to `EffectsField.applyEffect`, not arbitrary
+   * ActiveEffect creation. See `daggerheart/gm-action-effects.ts`.
+   */
+  relayActionEffects: "relayActionEffects",
+  /**
    * How many decks {@link SETTINGS.deckLimitEnabled} allows. Meaningless while
    * that switch is off, which is why the window greys it out then. Defaults to
    * 1 and is held to at least 1 on save — a limit of zero would mean "no decks

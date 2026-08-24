@@ -450,6 +450,17 @@ export function registerSettings(): void {
 
   /* ---- Daggerheart Utilities ---------------------------------------------- */
 
+  // Daggerheart applies an action's effects on the acting client, while core
+  // requires OWNER of the target. On by default: without the GM relay the
+  // system's own player-effect automation fails against ordinary adversaries.
+  game.settings.register(MODULE_ID, SETTINGS.relayActionEffects, {
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+    // Read for every application, so the next effect observes a changed value.
+  });
+
   // World-scoped: a cap on the decks in play is a table-wide rule the GM sets,
   // not a per-client preference. Off by default — it constrains something the
   // system itself leaves open.
@@ -539,9 +550,9 @@ export function registerSettings(): void {
   // `restricted: true` on all of them keeps them GM-only, which matters because
   // every setting above is world-scoped and only a GM can write one.
   //
-  // Registration order is DOM order in Foundry's settings list, so the two
-  // groups below are kept contiguous: `settings-groups.ts` heads each run of
-  // buttons with a divider, and it can only do that if the run is unbroken.
+  // Registration order is DOM order in Foundry's settings list, so the two menu
+  // groups below are kept contiguous. `settings-groups.ts` also gives the lone
+  // player-facing setting, which core renders after the menus, its own group.
   // Moving a menu between groups means moving both its registration here and
   // its entry in that file's SETTING_GROUPS.
 

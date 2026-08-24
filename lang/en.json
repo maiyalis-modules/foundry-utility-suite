@@ -41,6 +41,7 @@
 
   "EE.SettingsList.GeneralHeading": "General",
   "EE.SettingsList.DaggerheartHeading": "Daggerheart",
+  "EE.SettingsList.PlayerDaggerheartHeading": "Player Options: Daggerheart",
 
   "EE.Settings.GeneralFeaturesMenu.Name": "General Features",
   "EE.Settings.GeneralFeaturesMenu.Label": "Configure",
@@ -314,6 +315,15 @@
   "EE.Settings.DaggerheartUtilitiesMenu.Name": "Daggerheart Utilities",
   "EE.Settings.DaggerheartUtilitiesMenu.Label": "Configure Utilities",
   "EE.Settings.DaggerheartUtilitiesMenu.Hint": "Table rules for Daggerheart play, such as capping how many decks are in play at once.",
+
+  "EE.Settings.RelayActionEffects.Name": "Let players apply action effects to adversaries",
+  "EE.Settings.RelayActionEffects.Hint": "When a Daggerheart action applies an effect to a target the acting player does not own, ask the active GM's client to apply the original effect. This covers effects such as temporary Vulnerable on a successful hit; it does not relay arbitrary effect creation.",
+  "EE.Utilities.ActionEffectsLegend": "Action Effects",
+  "EE.ActionEffectRelay.NoGM": "An active GM must be connected to apply this effect to that target.",
+  "EE.ActionEffectRelay.Disabled": "The GM has disabled relaying action effects to targets players do not own.",
+  "EE.ActionEffectRelay.Unauthorized": "The GM rejected this action effect because you do not own its source actor.",
+  "EE.ActionEffectRelay.Invalid": "The GM could not verify the source effect or its target.",
+  "EE.ActionEffectRelay.Failed": "The action effect could not be applied by the GM.",
 
   "EE.Settings.DeckLimitEnabled.Name": "Limit the number of decks",
   "EE.Settings.DeckLimitEnabled.Hint": "Cap how many decks can be in play at once. Off by default — nothing is limited until you turn this on.",

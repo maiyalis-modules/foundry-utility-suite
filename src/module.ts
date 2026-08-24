@@ -25,6 +25,7 @@ import { registerGiftedTracker } from "./daggerheart/gifted-tracker.js";
 import { registerHoldThemOff } from "./daggerheart/hold-them-off.js";
 import { registerISeeItComing } from "./daggerheart/i-see-it-coming.js";
 import { registerGmEffects } from "./daggerheart/gm-effects.js";
+import { registerGmActionEffects } from "./daggerheart/gm-action-effects.js";
 import { registerNotGoodEnough } from "./daggerheart/not-good-enough.js";
 import { registerRangersFocus } from "./daggerheart/rangers-focus.js";
 import { registerReach } from "./daggerheart/reach.js";
@@ -87,6 +88,9 @@ Hooks.once("init", async () => {
   // player has no permission to do themselves. Listener only — the senders are
   // features, and it does nothing on a client that isn't the writing GM.
   registerGmEffects();
+  // Daggerheart applies action effects directly on the acting client's machine.
+  // Relay the copy through the GM only when that client does not own the target.
+  registerGmActionEffects();
   // Before the duality window, and the order is deliberate: Adaptability may
   // *replace* the roll outright, and Fearless asks whether to convert that
   // roll's Fear into Hope. Rerolling first means the question is asked about the
