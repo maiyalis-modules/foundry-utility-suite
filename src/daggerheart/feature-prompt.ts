@@ -927,6 +927,148 @@ export async function chooseFromList(request: ListRequest): Promise<string | nul
 }
 
 /**
+ * Ask which *one* entry of a list, as radio buttons. Returns the value, or null
+ * for a dialog that was cancelled or dismissed.
+ *
+ * ## Why this isn't {@link chooseFromList}
+ *
+ * Same question, same data — {@link ListRequest} is shared deliberately — but a
+ * different bargain about the reader's attention. A `<select>` shows one entry
+ * and hides the rest behind a click, which is right when the options are
+ * self-evident from their own names (a count, a die size) and the default is
+ * usually the answer. Radios show every option at once, which is what a list
+ * wants when each entry carries a *consequence* the reader has to weigh against
+ * the others — Commune's chart lines, where the choice is between three
+ * outcomes and comparing them is the whole decision.
+ *
+ * A rendering flag on `chooseFromList` would have been fewer lines and worse:
+ * the shapes in this file are named after the question they ask, and "which of
+ * these, having read them all" is a different question from "pick a number".
+ *
+ * The answer is read with `:checked` rather than off `form.elements`, which
+ * looks equivalent and is not: a group of several radios yields a RadioNodeList
+ * whose `value` is the checked entry's, but a group of *one* yields the input
+ * itself, whose `value` is its own regardless of whether anybody ticked it.
+ * (`:checked` matches a **disabled** input too, which is what makes the
+ * single-option case below still answerable.)
+ *
+ * ## A list of one is shown, not skipped
+ *
+ * One option renders as one checked, **disabled** radio rather than being
+ * returned without a dialog. A caller that never opens the prompt leaves the
+ * player with no idea a question was ever asked — the choice was made for them
+ * correctly and invisibly, which reads as the feature not working. Showing it
+ * says both things at once: here is what you were being asked, and here is why
+ * there was nothing to decide. Disabling it is presentational, since a lone
+ * radio cannot be un-checked by clicking anyway; it is there to look settled.
+ *
+ * No timeout, for the same reason as {@link chooseOne}: this is raised after an
+ * action has resolved, so nothing is being held back while the player decides.
+ */
+export async function chooseFromRadios(request: ListRequest): Promise<string | null> {
+  const { title, intro, options, initial, confirmLabel, cancelLabel } = request;
+  if (options.length === 0) return null;
+
+  const { DialogV2 } = foundry.applications.api;
+
+  const chosen = options.some((option) => option.value === initial)
+    ? initial
+    : options[0]!.value;
+
+  const settled = options.length === 1;
+
+  const markup = options
+    .map(
+      (option) =>
+        `<label class="ee-feature-radio${settled ? " ee-feature-radio-settled" : ""}">
+          <input type="radio" name="choice" value="${escapeHtml(option.value)}"${
+            option.value === chosen ? " checked" : ""
+          }${settled ? " disabled" : ""}>
+          <span class="ee-feature-radio-label">${escapeHtml(option.label)}</span>
+        </label>`,
+    )
+    .join("");
+
+  const answer = await DialogV2.wait({
+    classes: ["ee-feature-prompt"],
+    window: { title },
+    content: `<p>${escapeHtml(intro)}</p>
+      <div class="ee-feature-radios">${markup}</div>`,
+    buttons: [
+      {
+        action: "confirm",
+        label: confirmLabel,
+        default: true,
+        callback: (_event: Event, button: AnyObject) => ({
+          choice: String(
+            (button?.["form"] as HTMLFormElement | undefined)?.querySelector<HTMLInputElement>(
+              "input[name='choice']:checked",
+            )?.value ?? "",
+          ),
+        }),
+      },
+      { action: "cancel", label: cancelLabel },
+    ],
+    rejectClose: false,
+  }).catch(() => null);
+
+  const value = String((answer as AnyObject | null)?.["choice"] ?? "");
+  // Re-checked against the list this function rendered rather than trusted from
+  // the form, the way the other prompts do it.
+  return options.some((option) => option.value === value) ? value : null;
+}
+
+/** Everything needed to raise a {@link showNotice}. */
+export interface NoticeRequest {
+  title: string;
+  /** The framing sentence — what this is and where it came from. */
+  intro: string;
+  /**
+   * The text being delivered, set apart from the framing above it.
+   *
+   * Always somebody's authored prose rather than the module's own words, which
+   * is the whole reason it is a separate field: it is escaped and rendered in a
+   * quoted block, so it cannot be mistaken for the sentence introducing it.
+   */
+  body?: string;
+  /** Localized dismiss button. */
+  dismissLabel: string;
+}
+
+/**
+ * Tell one player something, with nothing to answer.
+ *
+ * The one shape in this file that asks no question. It exists because a feature
+ * whose result is decided on *somebody else's* client has no other way to put
+ * that result in front of the person it happened to — a chat card can be missed,
+ * and at a table playing with chat collapsed it will be. Everything else here
+ * returns an answer; this returns when the reader has closed it, and callers are
+ * free to ignore even that.
+ *
+ * No timeout, for the same reason as {@link chooseOne} and more strongly: there
+ * is no unmodified outcome waiting to be let through, so an unattended dialog
+ * costs nobody anything and expiring it would throw away the only delivery.
+ */
+export async function showNotice(request: NoticeRequest): Promise<void> {
+  const { title, intro, body, dismissLabel } = request;
+
+  const { DialogV2 } = foundry.applications.api;
+
+  const quoted =
+    typeof body === "string" && body.length > 0
+      ? `<p class="ee-feature-notice">${escapeHtml(body)}</p>`
+      : "";
+
+  await DialogV2.wait({
+    classes: ["ee-feature-prompt"],
+    window: { title },
+    content: `<p>${escapeHtml(intro)}</p>${quoted}`,
+    buttons: [{ action: "dismiss", label: dismissLabel, default: true }],
+    rejectClose: false,
+  }).catch(() => null);
+}
+
+/**
  * Face counts the system ships artwork for.
  *
  * Its `.dice` rule masks in a die shape from `--svg-die`, which is set by a

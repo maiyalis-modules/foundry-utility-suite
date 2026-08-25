@@ -18,6 +18,7 @@ import { registerDamageLanding } from "./daggerheart/damage-landing.js";
 import { registerBloodSpike } from "./daggerheart/blood-spike.js";
 import { registerCardTargeting } from "./daggerheart/card-targeting.js";
 import { registerCloseKnit } from "./daggerheart/close-knit.js";
+import { registerCommune } from "./daggerheart/commune.js";
 import { registerCompanion } from "./daggerheart/companion.js";
 import { registerCrimsonRite } from "./daggerheart/crimson-rite.js";
 import { registerDualityOutcome } from "./daggerheart/duality-outcome.js";
@@ -34,6 +35,7 @@ import { registerRangersFocus } from "./daggerheart/rangers-focus.js";
 import { registerReach } from "./daggerheart/reach.js";
 import { reconcileSlayerCards, registerSlayer } from "./daggerheart/slayer.js";
 import { installRollPipeline } from "./daggerheart/roll-pipeline.js";
+import { registerViciousEntangle } from "./daggerheart/vicious-entangle.js";
 import { registerHotbarPages } from "./hotbar/hotbar-pages.js";
 import { registerGinzzzuPortraits } from "./integrations/ginzzzu-portraits.js";
 import { registerQuickActionsRollRequest } from "./integrations/quickactions-roll-request.js";
@@ -150,8 +152,17 @@ Hooks.once("init", async () => {
   // Not a roll window at all: it repairs the card's own shape at preparation time
   // so the system resolves it natively, and takes no part in any ordering here.
   registerBlightingStrike();
+  // Not a roll window either: one card, whose second clause is a follow-up the
+  // SRD leaves entirely to the table. It answers that card's action chooser and
+  // then reads the price and the effect off the card's own second action, so it
+  // takes no part in any ordering.
+  registerViciousEntangle();
+  // Not a roll window either: one card whose dice are its own, rolled after the
+  // action has already resolved. It hooks `postUseAction` and a socket of its
+  // own, so its place in this list costs nothing.
+  registerCommune();
   // The single wrapper behind every rule that fires when damage lands. After the
-  // features, so every rule they register is already listed \x{2014} though the patch
+  // features, so every rule they register is already listed — though the patch
   // itself waits for `setup`, so the order is only tidiness.
   registerDamageLanding();
   // The single wrapper behind every card that declares a target it must not ask

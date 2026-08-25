@@ -1288,6 +1288,204 @@ loads).
     is one client's DOM and this text crosses a socket. Empty comes back as
     `null`, the same as cancelling: every caller has to handle "they backed out"
     anyway, and a blank answer means the same thing.
+- **Vicious Entangle** (`src/daggerheart/vicious-entangle.ts`) — the Sage domain's
+  level-1 spell, `Compendium.daggerheart.domains.Item.qvpvTnkAoRn9vYO4`. World
+  setting `viciousEntangleRestrain`, **on** by default, filed under Sage beside
+  Gifted Tracker.
+  - **The card is built correctly, unlike the Void's.** Two actions: **Cast**, an
+    `attack` with 1d8+1 physical and an embedded *Restrained* ActiveEffect
+    (`statuses: ["restrained"]`, `system.duration.type: "temporary"`), and
+    **Restrain Another**, an `effect` action charging 1 Hope with a second copy of
+    the same effect. The first sentence of the card therefore needs no help at
+    all: `EffectsField.execute` copies the effect onto every target whose
+    `hitResult.success` is true. Do not reshape this card — there is nothing wrong
+    with it.
+  - **What is missing is the join.** "Restrain Another" does not know whether the
+    Cast succeeded, does not know who it hit, and enforces "within Very Close
+    range of your target" nowhere. It is also a *peer* of the Cast in the action
+    chooser, so pressing the card asks which you meant before you have rolled the
+    one that gates the other.
+  - **A second `use()` is a second action, and the table is watching for
+    actions.** This is the same trap the chained version of Blighting Strike fell
+    into, and it is worth stating as a general rule: **anything that fires after a
+    card has resolved must not run another action workflow.**
+    `daggerheart-spotlight-tracker`'s guard sits on `daggerheart.preUseAction`; by
+    the time a follow-up runs the spotlight has already left the caster, so the
+    guard sees a player acting out of turn, **cancels the action** and raises a
+    "request the spotlight?" prompt mid-card. `action-watch.ts` and Ginzzzu's
+    Portraits watch the same events. Passing `actionType: "reaction"` in
+    `configOptions` *would* silence both halves of the tracker (each checks it
+    first), but it is a lie told to get the right behaviour by accident — a
+    follow-up is not a reaction, and any module that later distinguishes them
+    breaks.
+  - **So the workflow is skipped and its two effects are done directly, read off
+    the card.** The cost comes from the follow-up action's own `cost` array; the
+    effect from its `effects` array, resolved against the Item exactly as
+    `EffectsField.applyEffects` does (`item.applyEffects ?? item.effects`) and
+    applied through `EffectsField.applyEffect` — which is the static
+    `gm-action-effects.ts` wraps, so it still reaches an adversary the player does
+    not own. Effects first, cost second (the system's own 100/150 order, and the
+    charge is a local write that cannot really fail); nothing is charged if no
+    effect was found. One chat line replaces the card the workflow would have
+    posted.
+  - **`cost.itemId` disqualifies the card outright.** Charging is this file's own
+    job now, and it can only do the plain `actor.system.resources` kind;
+    `CostField.getItemIdCostUpdate` resolves an item cost against a path this
+    knows nothing about. A card carrying one keeps its chooser and its manual
+    button and gets no automation at all — better than approximating a price.
+  - **`config.targetUuid` is a supported override**, recorded here because it is
+    the right tool for a *different* job: `TargetField.prepareConfig` checks it
+    ahead of `game.user.targets` (`fromUuidSync(uuid)` then `actor.token ??
+    actor.prototypeToken`), and `prepareBaseConfig` spreads `configOptions` in. So
+    `action.use(event, { targetUuid })` aims a printed action at one actor without
+    touching the user's targets — correct whenever running a full workflow is
+    what you actually want. It wants an **actor** uuid; an unlinked token's
+    `actor.uuid` is its ActorDelta's, which correctly pins to that token.
+  - **If you ever do call `use()` by hand, pass `{ shiftKey: true }`, not
+    `null`.** `DHBaseAction.applyKeybindings` and `requireConfigurationDialog`
+    both read `config.event.shiftKey` unguarded, so a null event throws. A truthy
+    `shiftKey` sets `dialog.configure = false`, which skips the cost dialog *and*
+    makes `CostField.prepareConfig` return false — an outright refusal — when the
+    resource is short. Without it the workflow proceeds and charges anyway.
+  - **The chooser is answered at `ActionSelectionDialog.create`.** The system's
+    `game.system.api.applications.dialogs` namespace is `Object.freeze`d, so the
+    class is *reached* through it and the static is patched on the class itself.
+    `Item#use` does its `isDomainTouchedSuppressed` check and builds `actionsList`
+    before calling `create`, so wrapping `use` would mean reproducing both.
+    Returning `Promise.resolve(action)` from the wrapper is enough; `Item#use`
+    awaits it.
+  - **Range is measured from the target, not the caster** — that is the whole
+    content of the clause, and the caster may be a Far range from both. Where the
+    Cast hit more than one, Very Close of *any* of them qualifies and the picker
+    row names which. Unmeasurable distance means not offered, as everywhere else
+    here; the manual "Restrain Another" button on the card sheet is the
+    theatre-of-mind route and is deliberately left in place.
+  - **Not a preparation patch.** Nothing is written into prepared data, so the
+    setting needs no `onChange` reconciliation — unlike Blighting Strike, whose
+    reshape has to be undone.
+- **Commune** (`src/daggerheart/commune.ts`) — the Void's Witch class feature,
+  `Compendium.the-void-unofficial.classes.Item.PKcnVdqacraEf8uL`. World setting
+  `communeOracle`, **on** by default, filed under Witch in the Classes tab (the
+  entry was a bare `fromVoid("Witch")` before this).
+  - **The card is half-built, and the half it has is fine.** One `effect` action
+    with `uses: 1 / longRest` and `chatDisplay: true`, no cost and no effects. So
+    the once-per-long-rest tracking, the confirmation dialog (the system raises
+    one because the action has `uses`) and the description card all already work.
+    **Do not touch the use tracking** — duplicating it would mean two places to
+    be wrong.
+  - **What is missing is the whole oracle**: nothing rolls the d6s, nothing knows
+    how many, nothing offers the choice between the faces, nothing brings the GM
+    in. Four steps hang off `daggerheart.postUseAction`: roll, choose, post what
+    the chart says, ask the GM.
+  - **`actor.system.spellcastModifier` is the dice count.** It is the system's own
+    "what is your Spellcast trait" — the highest of the traits your subclasses
+    cast with, which is exactly what a Spellcast Roll adds. Reading
+    `subclass.system.spellcastingTrait` by hand would be a second implementation
+    of that rule and a wrong one for a multiclassed character. The formula is
+    clamped before it is built: a number that reaches a roll formula unvalidated
+    is how one bad Active Effect hangs a client.
+  - **The chart is three lang strings here, not parsed off the card.** The card
+    carries its bands as three `<li>`s inside `system.description`. Parsing them
+    would be a guess dressed as a read — it breaks on a translation or a
+    reformat, and it breaks *silently*, mapping a 6 to the wrong sentence. The
+    consequence is stated in the setting hint: a table that rewrote those lines
+    should switch this off.
+  - **Only distinct faces are offered.** "Choose one value from the rolled
+    results" — two 4s are one choice. An all-same roll still raises the prompt,
+    showing its one option settled: the choice is made for the player either way,
+    and a prompt that never appears leaves them unsure a question was ever asked,
+    which reads as the feature not working. Faces come off
+    `roll.dice[].results` (skipping `active: false`), never `roll.total`: the sum
+    is the one number this roll has no use for. They are listed **low to high**,
+    the order the card prints its chart in, so the prompt does not ask the reader
+    to re-map a list they already have in front of them; the highest is still the
+    one pre-selected, so the default sits at the bottom.
+  - **`showDiceEarly` is called here too, outside the roll pipeline** — the first
+    place that does. The picker must open on dice that have already landed, and
+    the message route cannot give that: Dice So Nice animates *from* the message,
+    `toMessage` resolves the moment the message is created, and nothing hands
+    back a handle on the animation afterwards. Throwing them by hand and awaiting
+    it is the only way to sequence the two, and the marker it leaves on the roll
+    makes `registerDiceSuppression` stop the message throwing them again. It is
+    given a **local** config object, not the action's: it writes `config.mute`,
+    which belongs to the system's `toChat` running concurrently (`postUseAction`
+    is not awaited), and a suppressed message has no dice sound to double anyway.
+    The pipeline's "only safe from inside `buildPost`" caveat is about the
+    appearance presets `DualityRoll.buildPost` stamps on before that seam; a plain
+    `Roll` of d6s has none, so it does not apply.
+  - `feature-prompt.ts` grew **`chooseFromRadios`**, the third shape of "which
+    one?", sharing `ListRequest` with `chooseFromList` unchanged. The three now
+    split by what the reader has to do: `chooseOne` gives each option a button
+    (few options, each its own act — "primary weapon or secondary?"); a
+    `<select>` shows one and hides the rest (a merely long list of self-evident
+    entries with an obvious default — a count, a die size); radios show every
+    option at once (each entry carries a *consequence* to be weighed against the
+    others, which is exactly Commune's chart). A rendering flag on
+    `chooseFromList` would have been fewer lines and wrong — the shapes here are
+    named after the question they ask, and "which of these, having read them
+    all" is not "pick a number".
+    - **The answer is read with `:checked`, not off `form.elements`.** They look
+      equivalent and are not: several radios yield a RadioNodeList whose `value`
+      is the checked entry's, but a group of *one* yields the input itself, whose
+      `value` is its own whether or not anybody ticked it. `:checked` also matches
+      a **disabled** input, which is what lets the single-option case still be
+      answered.
+    - **A list of one renders, checked and disabled, rather than being skipped.**
+      Baked into the helper rather than left to callers, because one option is
+      never a choice for anybody. The disabling is presentational — a lone radio
+      cannot be un-checked by clicking — and it is deliberately *not* dimmed to
+      the usual disabled opacity: the reader is being shown the answer, not
+      refused it.
+  - `feature-prompt.ts` also grew **`showNotice`**, the one shape there that asks
+    nothing. It exists because a feature whose result is decided on *somebody
+    else's* client has no other way to put that result in front of the person it
+    happened to. Its `body` is a separate field from `intro` on purpose: the body
+    is always somebody's authored prose, so it is escaped into a quoted block and
+    cannot be mistaken for the module's own sentence introducing it. Styled
+    identically to `.ee-commune-answer` on the chat card, because it is the same
+    words arriving by a second route and two appearances would read as two
+    different things.
+  - **The GM's half is fire-and-forget over the socket**, the shape
+    `gifted-tracker.ts` established — `isWriter()` locally, `SOCKET_EVENT`
+    otherwise, one dialog even with three GMs logged in. The payload carries only
+    a **message id**; everything the dialog says is re-read from that message's
+    `FLAGS.commune` flag, and a message without the flag is refused. That refusal
+    is the trust boundary: without it an arriving payload could steer a GM's
+    client into rewriting any chat message in the log.
+  - **The reply goes back the other way, and carries the words rather than an
+    id.** The card holding the answer is not enough on its own — a chat card can
+    be scrolled past, and at a table playing with the log collapsed it will be —
+    so the answer is *delivered* to whoever pressed the card, as a `showNotice`
+    dialog. The asymmetry with the request is deliberate and worth keeping: that
+    direction can make a GM's client **write**, so it names only an id and
+    re-reads everything from the flag; this one can only make a player's client
+    **display**, where the worst a forged payload achieves is a dialog of escaped
+    text any player could have typed into chat — while re-reading the flag here
+    would instead race the update that has only just been broadcast. The text is
+    still capped at the same limit the GM's own box enforces.
+  - **`askedBy` is recorded on the flag, not taken from `message.author`.** They
+    are the same user today and they answer different questions; "who asked the
+    spirits" and "who created this chat message" come apart the moment anything
+    else posts the card. A GM communing on a character of their own is skipped —
+    they typed the words a moment ago.
+  - **The flag is the record, not the markup.** `cardMarkup()` rebuilds the card
+    from `{ name, value, answer? }`, so the GM's answer replaces the content
+    rather than being appended to whatever HTML happens to be there — which is
+    what keeps a second answer from stacking.
+  - **`postUseAction` fires before `toChat`,** so in principle these messages
+    could land above the card that explains them. They do not: `Hooks.callAll`
+    does not await, so `use()` runs straight on into `toChat` while the first
+    `await` here is still pending. Worth knowing, not worth defending against.
+  - **`target.type: "any"` is suppressed** through `card-targeting.ts`, the same
+    leftover Gifted Tracker has: there is nothing on the scene to target when you
+    are asking a spirit a question, and the declaration would otherwise make
+    `daggerheart-target-helper` open a picker first. (Nyx's own copy has already
+    been edited to `self`; a fresh import from the Void pack has `any`.)
+  - **Deliberate silences.** The player's question is not asked for — it is
+    spoken at the table, and a text box would put transcription in front of a
+    conversation. "During a moment of calm" is not enforced; nothing on a sheet
+    knows whether the moment qualifies. A GM who dismisses the answer box is not
+    chased: narrating it aloud is a legitimate answer.
 - **Companion** (`src/daggerheart/companion.ts`) — the Beastbound subclass's
   foundation card, made pressable. World setting `companionCommands`, **on** by
   default, filed under Ranger with its own `BeastboundLegend` group (same rule as
@@ -1765,6 +1963,22 @@ loads).
     system has applied.
   - Both get `applying`, computed from the system's own answer
     (`force || getApplyAutomation()`) rather than a copy of the rule.
+  - **`withoutApplyButtons()`** (in `roll-pipeline.ts`) keeps the system's *Deal
+    Damage* / *Apply Healing* pair off a plain roll card. The system assigns
+    `globalThis.Roll = BaseRoll`, so **every** `new Roll()` in the world renders
+    through its `templates/ui/chat/foundryRoll.hbs`, which hangs both buttons
+    under the total — fair for a GM typing `/r 2d6`, wrong for a die a rule asked
+    for and whose meaning is already fixed. Spread the result into the data given
+    to `Roll#toMessage`; it returns the whole `flags` key, so merge by hand if the
+    caller has flags of its own. The template's own escape hatch is
+    `{{#unless flags.core.RollTable}}`, which would silence them in one line and
+    was rejected: it is a lie told to core, in a flag core reads for its own
+    purposes. Marking the message as ours and removing the buttons on render says
+    the true thing for one hook. Registered **before** every guard in
+    `installRollPipeline`, since it has nothing to do with the `DHRoll` patch.
+    **Known gap:** `i-see-it-coming.ts` posts its d4 without this and so still
+    offers to apply an Evasion bonus as damage. Left alone pending a decision, not
+    because it is right.
   - `damagedTargets(config, targets)` is exported because it is the same default
     `applyDamage` itself applies (`targets ?? config.targets.filter(t =>
     t.hitResult?.success)`), so a rule and the system can never disagree about who
@@ -2025,7 +2239,7 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
     Tracker under Sage, Not Good Enough under Blade, Attack of Opportunity and
-    Slayer under Warrior). A subclass has no home of
+    Slayer under Warrior, Commune under Witch). A subclass has no home of
     its own, so its rules are filed under its parent class in a group of their own — Hybrid Form under
     Blood Hunter, Beastbound under Ranger, Slayer (Call of the Slayer) under
     Warrior. All four

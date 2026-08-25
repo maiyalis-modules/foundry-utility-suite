@@ -356,6 +356,20 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // World-scoped like the rest. It governs two clients at once: the chooser is
+  // answered wherever the card is pressed, and the follow-up presses an action
+  // whose effect may be relayed to the GM to land. Nothing here is written into
+  // prepared data, so unlike Blighting Strike it needs no reconciliation — the
+  // next press reads the new value.
+  game.settings.register(MODULE_ID, SETTINGS.viciousEntangleRestrain, {
+    name: "EE.Settings.ViciousEntangleRestrain.Name",
+    hint: "EE.Settings.ViciousEntangleRestrain.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   // World-scoped for a reason beyond consistency here too: the actions this adds
   // are built during data preparation on every client that prepares the card, and
   // the range origin they declare is read on whichever client rolled. A per-user
@@ -370,6 +384,19 @@ export function registerSettings(): void {
     // Same reason as Reach: the buttons are added as documents are prepared, and
     // nothing re-prepares an open sheet on its own.
     onChange: () => reconcileCompanionCards(),
+  });
+
+  // World-scoped, and not merely for consistency: the dice are rolled wherever
+  // the card is pressed and the answer is typed on the GM's client, so two
+  // machines have to agree the feature exists. Nothing is written into prepared
+  // data, so no reconciliation is needed — the next press reads the new value.
+  game.settings.register(MODULE_ID, SETTINGS.communeOracle, {
+    name: "EE.Settings.CommuneOracle.Name",
+    hint: "EE.Settings.CommuneOracle.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
   });
 
   // World-scoped for the same reason as Companion, and it shares the mechanism:

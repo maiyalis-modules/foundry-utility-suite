@@ -320,7 +320,23 @@ const CLASSES: Catalog = {
     fromVoid("Brawler"),
     fromVoid("Summoner"),
     fromVoid("Warlock"),
-    fromVoid("Witch"),
+    {
+      id: "witch",
+      label: "Witch",
+      fromVoid: true,
+      groups: [
+        {
+          legend: "EE.Automation.FeaturesLegend",
+          settings: [
+            {
+              key: SETTINGS.communeOracle,
+              name: "EE.Settings.CommuneOracle.Name",
+              hint: "EE.Settings.CommuneOracle.Hint",
+            },
+          ],
+        },
+      ],
+    },
   ],
 };
 
@@ -377,6 +393,11 @@ const DOMAINS: Catalog = {
               key: SETTINGS.giftedTrackerEvasion,
               name: "EE.Settings.GiftedTrackerEvasion.Name",
               hint: "EE.Settings.GiftedTrackerEvasion.Hint",
+            },
+            {
+              key: SETTINGS.viciousEntangleRestrain,
+              name: "EE.Settings.ViciousEntangleRestrain.Name",
+              hint: "EE.Settings.ViciousEntangleRestrain.Hint",
             },
           ],
         },

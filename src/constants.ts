@@ -243,6 +243,21 @@ export const SETTINGS = {
    */
   giftedTrackerEvasion: "giftedTrackerEvasion",
   /**
+   * Master switch for automating **Vicious Entangle** (Sage domain): pressing the
+   * card goes straight to the Spellcast roll instead of asking which of its two
+   * actions you meant, and a successful cast offers to spend a Hope to Restrain
+   * one more adversary within Very Close of whoever it hit, reading the price and
+   * the effect off the card's own "Restrain Another" action rather than pressing
+   * it. See `daggerheart/vicious-entangle.ts`.
+   *
+   * World-scoped and **on** by default, for the same reasons as
+   * {@link SETTINGS.fearlessFearToHope}. The cast itself is untouched — its
+   * damage and its Restrained effect are the card's own — and "Restrain Another"
+   * stays on the card sheet as the manual route, so switching this off leaves the
+   * card exactly as the SRD ships it.
+   */
+  viciousEntangleRestrain: "viciousEntangleRestrain",
+  /**
    * Master switch for the Beastbound **Companion** card: it grows two buttons —
    * the companion's attack, and a plain action roll — and both are made as the
    * ranger's own Spellcast Roll, with the companion's Experiences on offer for a
@@ -255,6 +270,21 @@ export const SETTINGS = {
    * both of its buttons either way.
    */
   companionCommands: "companionCommands",
+  /**
+   * Master switch for automating **Commune** (Witch, *Void for Daggerheart*):
+   * the card rolls a d6 per point of your Spellcast trait, asks which of the
+   * rolled values you are keeping, posts what the chart says it bought, and puts
+   * a box on the GM's screen to write the answer into that same card. See
+   * `daggerheart/commune.ts`.
+   *
+   * World-scoped and **on** by default, like the rest — and here it is not only
+   * for consistency: the dice are rolled on the player's client and the answer is
+   * typed on the GM's, so two machines have to agree the feature exists. The
+   * card's own once-per-long-rest use is untouched either way, so switching this
+   * off leaves the button doing exactly what the Void ships: burning the use and
+   * posting the chart.
+   */
+  communeOracle: "communeOracle",
   /**
    * Master switch for automating **Close-Knit** (Hearthborne, *Void for
    * Daggerheart*): put a "share Hope" action on a card the Void ships as prose,
@@ -586,6 +616,29 @@ export const FLAGS = {
    * effect expiry off. An effect built by hand without this flag is left alone.
    */
   closeKnit: "closeKnit",
+  /**
+   * Marks the chat card this module posts for a **Commune**, and records what it
+   * is a card *of*: `{ name, value, answer? }`.
+   *
+   * The flag, not the markup, is the record. The GM's half re-reads it and
+   * rebuilds the card's content around the answer, which is what keeps a second
+   * answer from stacking on top of a first — and, because a message without the
+   * flag is refused outright, it is also the boundary that stops an arriving
+   * socket payload from steering a GM's client into editing some other message.
+   */
+  commune: "commune",
+  /**
+   * Marks a chat message carrying a plain Roll this module posted **for
+   * information only** — a die a rule told someone to roll, not damage and not
+   * healing.
+   *
+   * The system replaces core's roll card with its own `foundryRoll.hbs`, which
+   * hangs "Deal Damage" and "Apply Healing" under *every* plain roll — reasonable
+   * for a GM's manual `/r 2d6`, wrong for a die whose meaning the rule already
+   * fixed. `roll-pipeline.ts` strips those two buttons from a message carrying
+   * this flag; see `withoutApplyButtons`.
+   */
+  plainRoll: "plainRoll",
 } as const;
 
 /** Foundry template paths (served from the module root at runtime). */

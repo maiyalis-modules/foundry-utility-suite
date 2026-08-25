@@ -713,6 +713,48 @@
   font-family: inherit;
 }
 
+/* The quoted block on a `showNotice` prompt. Same treatment as `.ee-commune-answer`
+ * on the chat card, and deliberately so: it is the same words arriving by a
+ * second route, and giving them two appearances would make the reader wonder
+ * whether they are two different things. */
+.ee-feature-prompt .ee-feature-notice {
+  margin: 0.5rem 0 0.25rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--golden-40, rgb(243 194 103 / 25%));
+  font-style: italic;
+  white-space: pre-wrap;
+}
+
+/* The radio prompt (`chooseFromRadios`). Laid out like `.ee-feature-toggle`
+ * below — control, label, the label free to wrap under itself rather than under
+ * the button — because the two are the same kind of control and one of them is
+ * already the house pattern for a box beside a sentence. The whole row is the
+ * hit target, which matters here more than for a one-line toggle: these labels
+ * are sentences, and a reader aiming at a 13px circle is being asked to be
+ * accurate about a choice they have already made. */
+.ee-feature-prompt .ee-feature-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.ee-feature-prompt .ee-feature-radio {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  cursor: pointer;
+}
+
+/* The lone option of a one-entry radio group: disabled, and saying so quietly.
+ * Not dimmed to the usual disabled opacity — it is the answer, and the reader is
+ * being shown it rather than refused it. The default cursor is the whole of the
+ * "there is nothing to press here" message. */
+.ee-feature-prompt .ee-feature-radio-settled {
+  cursor: default;
+}
+
 /* The dropdown prompt (`chooseFromList`). Full width like the textarea above it,
  * so the field reads as the answer to the sentence rather than as a control
  * floating beside one. */
@@ -919,4 +961,26 @@
 .ee-adaptability-button:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+/* Commune's chat card — the chosen value, what the chart says it bought, and
+ * the GM's answer once there is one.
+ *
+ * Only the answer is decorated, and only just: a left rule and italics, the way
+ * quoted speech is set everywhere else. Everything above it is the module's own
+ * words about dice, which belong in the card's ordinary voice; the answer is the
+ * GM speaking in a spirit's, and the rule is what says so without a box that
+ * would make one paragraph shout over the two above it. */
+.ee-commune-effect {
+  margin: 0.25rem 0 0;
+}
+
+.ee-commune-answer {
+  margin: 0.5rem 0 0;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--golden-40, rgb(243 194 103 / 25%));
+  font-style: italic;
+  /* Newlines the GM typed are real: an answer is prose, and a paragraph break
+   * they put in should survive into the card. */
+  white-space: pre-wrap;
 }

@@ -33,7 +33,7 @@
  * possible. `D20Roll` having no `buildPost` is also why adversary attack rolls
  * arrive here directly.
  */
-import { LOG_PREFIX } from "../constants.js";
+import { FLAGS, LOG_PREFIX, MODULE_ID } from "../constants.js";
 
 /**
  * The system version these seams were read against. Everything here reaches into
@@ -529,6 +529,54 @@ function registerDiceSuppression(): void {
 }
 
 /**
+ * Message data that keeps the system's apply buttons off a plain roll card.
+ *
+ * ## The problem
+ *
+ * The system assigns `globalThis.Roll = BaseRoll`, so *every* plain `new Roll()`
+ * in the world — ours included — renders through its
+ * `templates/ui/chat/foundryRoll.hbs`, which hangs **Deal Damage** and **Apply
+ * Healing** under the total. That is a fair default for a GM typing `/r 2d6`
+ * into chat, where nobody but the GM knows what the number means. It is wrong
+ * for a die a *rule* asked for, where the meaning is already fixed: I See It
+ * Coming's d4 is Evasion, Commune's d6s are an oracle, and neither is damage
+ * anybody could apply.
+ *
+ * ## Why a flag and not the template's own escape hatch
+ *
+ * `foundryRoll.hbs` wraps the buttons in `{{#unless flags.core.RollTable}}`, so
+ * claiming to be a RollTable draw would silence them in one line. It would also
+ * be a lie told to core about where the message came from, in a flag core reads
+ * for its own purposes. Marking the message as *ours* and taking the buttons out
+ * afterwards says the true thing instead, and costs one hook.
+ *
+ * Spread into the data handed to `Roll#toMessage`. Merge by hand if the caller
+ * has flags of its own — this returns the whole `flags` key.
+ */
+export function withoutApplyButtons(): AnyObject {
+  return { flags: { [MODULE_ID]: { [FLAGS.plainRoll]: true } } };
+}
+
+/**
+ * Take the system's Deal Damage / Apply Healing buttons off our own roll cards.
+ *
+ * A render hook rather than a `preCreate` one, because the buttons are added by
+ * the roll's chat *template* at render time — there is nothing in the message
+ * document to suppress. Scoped to messages carrying {@link FLAGS.plainRoll}, so
+ * nothing else on the table loses a control it was offered.
+ */
+function registerApplyButtonSuppression(): void {
+  Hooks.on("renderChatMessageHTML", (message: AnyObject, html: HTMLElement) => {
+    try {
+      if (message?.["flags"]?.[MODULE_ID]?.[FLAGS.plainRoll] !== true) return;
+      html.querySelector(".roll-buttons.apply-buttons")?.remove();
+    } catch (error) {
+      console.warn(`${LOG_PREFIX} Roll pipeline: could not tidy a roll card.`, error);
+    }
+  });
+}
+
+/**
  * Install the patch. Call once during `init`, after every window has registered.
  *
  * The original is always called, and a throw from any window is swallowed: a
@@ -536,6 +584,11 @@ function registerDiceSuppression(): void {
  * chat card and the resource updates behind it.
  */
 export function installRollPipeline(): void {
+  // First, and outside every guard below it: this one has nothing to do with the
+  // DHRoll patch, and a world where that patch cannot be installed should still
+  // not be offered "Deal Damage" on an Evasion die.
+  registerApplyButtonSuppression();
+
   const DHRoll = CONFIG["Dice"]?.daggerheart?.DHRoll as AnyObject | undefined;
   if (!DHRoll) {
     console.warn(`${LOG_PREFIX} Roll pipeline: DHRoll not found — feature automation is off.`);

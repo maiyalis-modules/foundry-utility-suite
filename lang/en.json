@@ -109,6 +109,9 @@
   "EE.Settings.CompanionCommands.Name": "Companion",
   "EE.Settings.CompanionCommands.Hint": "Put your animal companion's actions on the Beastbound \"Companion\" card, so commanding them starts where you'd look for it. As shipped that card is description-only: the rule — \"Make a Spellcast Roll to connect with your companion and command them to take action\" — lives on the companion's own sheet, where the attack button rolls as the companion, sending the Hope and Fear to an actor that has no Hope and leaving every bonus on your sheet out of it. With this on, the card offers two actions: your companion's attack, and a plain action roll for everything else. Both are your own Spellcast Roll — your trait, your bonuses, your Hope and Fear — and both offer your companion's Experiences for a Hope each, the way the card says. The attack keeps your companion's range, target and damage, and its range is measured from your companion's token rather than yours, so it can reach what it's standing next to (that last part needs Maiyalis: Target Helper, which is what gates range at all). On a success with Hope a note goes to chat reminding the table that your next action can gain advantage if it builds on their success — whether it does is the GM's call, so nothing is applied for you. Nothing is written to the card: switch this off, or unbind the companion, and it goes back to being description-only.",
 
+  "EE.Settings.CommuneOracle.Name": "Commune",
+  "EE.Settings.CommuneOracle.Hint": "Run the oracle on the Void's Witch class feature \"Commune\". As shipped, the card is description-only where it matters: pressing it spends your once-per-long-rest use and posts the chart, and everything after that — the dice, the choice, the answer — is left to the table. With this on, pressing it rolls a d6 for each point of your Spellcast trait (the same trait a Spellcast Roll uses, and the higher one if you're multiclassed) and throws them in chat where everyone can see them, then asks which of the rolled values you're keeping. Distinct values only: a pair of 4s is one choice, and a roll that came up all the same face doesn't ask at all. A card then posts saying what that value bought — a flavor, a scent or a sensation on a 1-3; sounds or a vision on a 4-5; a scene experienced as if you were there on a 6 — and the GM is given a box to write the answer into, which lands in that same card. A GM who'd rather narrate it aloud can dismiss the box, and the card stands as rolled. The card's own use tracking is never touched, so switching this off returns the button to burning the use and posting the chart. Note the chart lives in this module rather than being read off the card, so a table that rewrote those three lines should leave this off.",
+
   "EE.Settings.CloseKnitShareHope.Name": "Close-Knit",
   "EE.Settings.CloseKnitShareHope.Hint": "Put a \"Share Hope\" button on the Void's Hearthborne \"Close-Knit\" card, which ships as description only. Press it and you're asked who receives — every character assigned to a player, plus anyone standing on the current scene, each shown with the Hope they're already holding — and then how much of your own Hope to hand over. Nothing is spent until both questions are answered, so backing out of either costs you nothing. The Hope moves straight onto the other sheet, which needs a GM connected, the same as marking an adversary's Stress does. Using it puts a \"Close-Knit (spent)\" effect on your sheet that the system clears at your next long rest; delete it by hand to give the use back. Giving more Hope than an ally can hold spends all of it and says so — the card says any number, and the system caps every resource on the way in.",
   "EE.Settings.AttackOfOpportunity.Name": "Attack of Opportunity",
@@ -122,6 +125,8 @@
 
   "EE.Settings.GiftedTrackerEvasion.Name": "Gifted Tracker",
   "EE.Settings.GiftedTrackerEvasion.Hint": "Make the Sage domain's \"Gifted Tracker\" card grant its Evasion bonus the way it's written, against the creatures you tracked rather than against everything. As shipped the card applies a flat, permanent +1 Evasion to whoever you have targeted, which is wrong twice over — it never expires and it applies to every attack in the game. With this on, that effect is suppressed and replaced: press the card, spend as much Hope as you like (the system's own prompt), then say what you're following — \"three sets of clawed prints, heading north\" — and the GM is shown your description alongside a searchable list of every creature on the scene, in the world, and in every Actor compendium you have installed. Whatever the GM picks is recorded on your sheet as an effect naming your quarry, and from then on any attack one of those creatures makes against you is resolved against +1 Evasion, before the chat card is posted — so it can turn a hit into a miss, and it says so in chat when it does. Only one quarry at a time: using the card again on fresh tracks ends the previous tracking and says so in chat. Nothing else ends it automatically — losing the trail is a call for the table, made by deleting the effect from the sheet. Matching is by compendium entry, actor and name together, so picking one statblock covers every token of it. Note the bonus is applied to adversary attacks; a creature built on a character sheet rolls Duality instead and isn't covered.",
+  "EE.Settings.ViciousEntangleRestrain.Name": "Vicious Entangle",
+  "EE.Settings.ViciousEntangleRestrain.Hint": "Automate the Sage domain's \"Vicious Entangle\" card. Two things change. Pressing the card no longer asks which of its two actions you meant — it goes straight to the Spellcast Roll, and the damage and the Restrained effect on your target stay exactly as the card ships them. Then, on a success, the card's second sentence is offered where the rule actually allows it: every other adversary within Very Close range of whoever you hit, nearest first, each row naming the target it is standing beside. Pick one and they are Restrained and the Hope is spent — both read off the card itself, so a house-ruled cost or a swapped effect is honoured, and a line in chat says what it cost. Declining or dismissing the picker costs nothing. Nothing is offered on a miss, on a cast with no target, to a caster who cannot pay, or to an adversary whose distance cannot be measured — a Hope should not be spent on an assumed range, and the card's own \"Restrain Another\" button is still there for those cases. The picker lists only adversaries the player can see.",
 
   "EE.Settings.VoidHybridFormPortrait.Name": "Sync portrait to Hybrid Form",
   "EE.Settings.VoidHybridFormPortrait.Hint": "When The Void puts an Order of the Lycan character into Hybrid Form, change the character sheet portrait to match the transformed token art, and change it back when the form is dropped.",
@@ -265,6 +270,33 @@
   "EE.Features.GiftedTracker.Announced": "{name} spends {hope} Hope tracking {names}.",
   "EE.Features.GiftedTracker.Replaced": "This ends the previous tracking: {names}.",
   "EE.Features.GiftedTracker.Evaded": "{attacker} misses {name}, who has tracked them — Evasion {before} → {after}.",
+
+  "EE.Features.ViciousEntangle.Title": "Vicious Entangle",
+  "EE.Features.ViciousEntangle.Intro": "Your vines have {targets} Restrained. Spend {cost} to catch one more adversary within {range} of them.",
+  "EE.Features.ViciousEntangle.Confirm": "Spend {cost}",
+  "EE.Features.ViciousEntangle.Decline": "Let the others be",
+  "EE.Features.ViciousEntangle.Distance": "{distance} {units} from {anchor}",
+  "EE.Features.ViciousEntangle.CannotPay": "Vicious Entangle: you no longer have {cost} to spend, so nothing was entangled.",
+  "EE.Features.ViciousEntangle.Announced": "{name} spends {cost}; the vines catch {target}, who is Restrained.",
+
+  "EE.Features.Commune.Title": "Commune",
+  "EE.Features.Commune.RollFlavor": "Commune — choose one value",
+  "EE.Features.Commune.Choose": "Which value are you keeping?",
+  "EE.Features.Commune.Option": "{value} — {effect}",
+  "EE.Features.Commune.Keep": "Keep it",
+  "EE.Features.Commune.Result": "{name} communes, and keeps a {value}.",
+  "EE.Features.Commune.Sensation": "You taste a flavor, smell a scent, or feel a sensation relevant to the answer.",
+  "EE.Features.Commune.Vision": "You hear sounds or see a vision relevant to the answer.",
+  "EE.Features.Commune.Scene": "You psychically experience a scene relevant to the answer as if you were there.",
+  "EE.Features.Commune.GmIntro": "{name} communed and kept a {value}. {effect} What comes through?",
+  "EE.Features.Commune.AnswerPlaceholder": "Wet stone, and a bell tolling somewhere far below…",
+  "EE.Features.Commune.AnswerConfirm": "Send it through",
+  "EE.Features.Commune.Sent": "Commune: the GM has been asked what comes through.",
+  "EE.Features.Commune.NoticeIntro": "You kept a {value}. {effect}",
+  "EE.Features.Commune.NoticePlain": "Your communing is answered.",
+  "EE.Features.Commune.NoticeDismiss": "Take it in",
+  "EE.Features.Commune.NothingWritten": "Commune: nothing was written down, so the card stands as rolled.",
+  "EE.Features.Commune.NoTrait": "Commune rolls a d6 for each point of your Spellcast trait, and yours is not above zero — there are no dice to roll.",
 
   "EE.Features.Companion.Attack": "Attack",
   "EE.Features.Companion.AttackHint": "<p>{companion} attacks. You make the Spellcast Roll; spend a Hope to add one of their Experiences. The attack reaches from where {companion} is standing, not from you.</p>",

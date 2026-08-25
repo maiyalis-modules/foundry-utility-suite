@@ -166,6 +166,14 @@ declare global {
       contents: AnyObject[];
       get(id: string): AnyObject | undefined;
     } & AnyObject;
+    /**
+     * The chat log. Undefined before the `setup` hook. A message fetched here
+     * carries `update`, which a GM may call on anybody's message.
+     */
+    messages?: {
+      contents: AnyObject[];
+      get(id: string): AnyObject | undefined;
+    } & AnyObject;
     /** Every sidebar folder in the world, across all document types. */
     folders?: {
       contents: AnyObject[];
@@ -220,6 +228,12 @@ declare global {
     constructor(formula: string, data?: AnyObject, options?: AnyObject);
     readonly formula: string;
     readonly total: number;
+    /**
+     * The roll's DiceTerms, in formula order. Each carries a `results` array of
+     * `{ result, active }` — the individual faces, which is the only thing a
+     * roll asked to "choose one value" has any use for.
+     */
+    readonly dice: AnyObject[];
     evaluate(options?: AnyObject): Promise<Roll>;
     toMessage(data?: AnyObject, options?: AnyObject): Promise<AnyObject | undefined>;
     /**
