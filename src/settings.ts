@@ -399,6 +399,21 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // World-scoped, and here about as plainly as it gets: the rule pauses one
+  // client's roll to ask a question on another client's screen, and the answer
+  // rewrites the Hope, the Fear and the hit that the whole table reads off a
+  // single chat card. Nothing is written into prepared data — the next roll reads
+  // the new value — and a roll already rewritten stays rewritten, which is what
+  // the persisted duality marker is for.
+  game.settings.register(MODULE_ID, SETTINGS.witchsCharm, {
+    name: "EE.Settings.WitchsCharm.Name",
+    hint: "EE.Settings.WitchsCharm.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   // World-scoped, and not merely for consistency: this changes a number a chat
   // card prints for the whole table, so a per-user answer would have two people
   // reading different totals off the same potion. Nothing is written into

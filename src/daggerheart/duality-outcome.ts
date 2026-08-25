@@ -148,6 +148,32 @@ function patchDualityGetters(DualityRoll: AnyObject): void {
   }
 }
 
+/**
+ * Rewrite a Duality roll's Hope/Fear result, everywhere it is read from.
+ *
+ * Two writes, and both are needed. `config.roll.result.duality` is what the four
+ * consumers still ahead of this window read — the countdowns, the Fear or Hope
+ * grant, the `dualityRoll` trigger and the `fearRoll` one — so it is the change
+ * that actually suppresses them. The marker in `roll.options` is what makes the
+ * chat card, a page reload and every other client agree afterwards, through the
+ * two getters {@link patchDualityGetters} teaches to honour it.
+ *
+ * Exported because `witchs-charm.ts` converts a result too, from a window of its
+ * own, and a second copy of this would be one more thing to keep in step with the
+ * system's `withHope`/`withFear`.
+ */
+export function setRollDuality(roll: AnyObject, config: AnyObject, next: number): void {
+  const result = config["roll"]?.["result"];
+  if (!result) return;
+
+  result["duality"] = next;
+  result["label"] = game.i18n.localize(
+    next === WITH_HOPE ? "DAGGERHEART.GENERAL.hope" : "DAGGERHEART.GENERAL.fear",
+  );
+
+  if (roll["options"]) roll["options"][DUALITY_OVERRIDE] = next;
+}
+
 /** The actor that made the roll, or null when the roll has no owner. */
 function rollActor(roll: AnyObject, config: AnyObject): AnyObject | null {
   // What the system's own `handleTriggers` uses; the uuid is the fallback for
@@ -178,18 +204,7 @@ function buildContext(roll: AnyObject, config: AnyObject, actor: AnyObject): Dua
     fearTotal: Number(config["roll"]?.["fear"]?.["value"] ?? 0),
 
     setDuality(next: number): void {
-      // The config field is what the four downstream consumers read, so this is
-      // the change that actually suppresses the Fear, the countdowns and the
-      // `fearRoll` triggers.
-      result["duality"] = next;
-      result["label"] = game.i18n.localize(
-        next === WITH_HOPE ? "DAGGERHEART.GENERAL.hope" : "DAGGERHEART.GENERAL.fear",
-      );
-
-      // The persisted marker is what makes the chat card, a page reload and every
-      // other client agree — see the note at the top of this file.
-      if (roll["options"]) roll["options"][DUALITY_OVERRIDE] = next;
-
+      setRollDuality(roll, config, next);
       this.duality = next;
     },
 

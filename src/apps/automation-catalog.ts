@@ -333,6 +333,11 @@ const CLASSES: Catalog = {
               name: "EE.Settings.CommuneOracle.Name",
               hint: "EE.Settings.CommuneOracle.Hint",
             },
+            {
+              key: SETTINGS.witchsCharm,
+              name: "EE.Settings.WitchsCharm.Name",
+              hint: "EE.Settings.WitchsCharm.Hint",
+            },
           ],
         },
         {

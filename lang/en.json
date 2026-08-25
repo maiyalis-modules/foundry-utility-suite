@@ -112,6 +112,9 @@
   "EE.Settings.CommuneOracle.Name": "Commune",
   "EE.Settings.CommuneOracle.Hint": "Run the oracle on the Void's Witch class feature \"Commune\". As shipped, the card is description-only where it matters: pressing it spends your once-per-long-rest use and posts the chart, and everything after that — the dice, the choice, the answer — is left to the table. With this on, pressing it rolls a d6 for each point of your Spellcast trait (the same trait a Spellcast Roll uses, and the higher one if you're multiclassed) and throws them in chat where everyone can see them, then asks which of the rolled values you're keeping. Distinct values only: a pair of 4s is one choice, and a roll that came up all the same face still asks, showing its single option already chosen. A card then posts saying what that value bought — a flavor, a scent or a sensation on a 1-3; sounds or a vision on a 4-5; a scene experienced as if you were there on a 6 — and the GM is given a box to write the answer into, which lands in that same card. A GM who'd rather narrate it aloud can dismiss the box, and the card stands as rolled. The card's own use tracking is never touched, so switching this off returns the button to burning the use and posting the chart. Note the chart lives in this module rather than being read off the card, so a table that rewrote those three lines should leave this off.",
 
+  "EE.Settings.WitchsCharm.Name": "Witch's Charm",
+  "EE.Settings.WitchsCharm.Hint": "Make the Void's Witch class feature \"Witch's Charm\" do what it says. The card ships one action, \"Spend Hope\", and all it does is take 3 Hope — the conversion is left to the table, which by then means walking back the Hope the roller has already been given, handing the GM the Fear they haven't, and arguing with a chat card that has already printed a miss. With this on, a failed action roll pauses just before its card is posted and the question goes to every character within Far range who is holding this feature and has 3 Hope to spend, starting with the roller if it is theirs. Say yes and the roll becomes a success with Fear: the hit is re-decided, the Hope is not granted, the GM gains the Fear instead, and the card posts already reading that way — on every screen, and after a reload. They are asked one at a time and the first yes settles it, so two witches never pay for one rescue. Only a roll the system actually scored can be caught: an attack, or a check the GM entered a Difficulty for. A Difficulty kept in the GM's head leaves nothing to fail against, so nothing is offered, and the card's own button is still there to press by hand. Range is measured on the canvas the way the ruler measures it, so a scene where one of them has no token raises no prompt rather than guessing. Reaction rolls are left alone — they are not action rolls, which is why the system withholds Hope and Fear from them too.",
+
   "EE.Settings.HerbalRemedies.Name": "Herbal Remedies",
   "EE.Settings.HerbalRemedies.Hint": "Apply the Void's Hedge Witch subclass feature \"Herbal Remedies\" to consumables: when one clears Hit Points or Stress, it clears one more. The Void ships the card as prose and there is nothing else it could ship, because the rule fires on somebody else's button — whichever potion happens to get drunk. With this on, that extra point is added to the consumable's own formula before it is rolled, so a Minor Health Potion rolls 1d4 + 1 and the number the card prints is the number the sheet moves. That matters more than it sounds: a healing consumable declares no target, so nothing is ever applied automatically and the number is almost always marked off by hand. Hope and Armor Slots are left alone, since the card names Hit Points and Stress, and so is a consumable that clears a resource outright (\"clear all HP and Stress\"), which has no number to raise. \"You or an ally\" is read as: a character using a consumable, in a world where some character has this card. That is deliberately loose — the tighter readings all break at a table where the GM owns every sheet, or between sessions when nobody has a token on a scene — so a world holding both a Hedge Witch and a rival party who also drink potions should leave this off.",
 
@@ -205,6 +208,16 @@
 
   "EE.Features.Fearless.Label": "Fearless",
   "EE.Features.Fearless.Hint": "Mark 2 Stress to change this into a roll with Hope instead.",
+
+  "EE.Features.WitchsCharm.Title": "Before the roll resolves",
+  "EE.Features.WitchsCharm.Intro": "{roller} failed an action roll.",
+  "EE.Features.WitchsCharm.IntroTarget": "{roller} failed an action roll against {targets}.",
+  "EE.Features.WitchsCharm.Label": "Witch's Charm",
+  "EE.Features.WitchsCharm.Hint": "Spend 3 Hope to make {roller}'s roll a success with Fear instead. The GM gains the Fear.",
+  "EE.Features.WitchsCharm.HintSelf": "Spend 3 Hope to make this a success with Fear instead. You gain no Hope from it, and the GM gains the Fear.",
+  "EE.Features.WitchsCharm.Spend": "Spend 3 Hope",
+  "EE.Features.WitchsCharm.Keep": "Let it fail",
+  "EE.Features.WitchsCharm.Spent": "{witch} spends 3 Hope — Witch's Charm. {roller}'s roll succeeds, with Fear.",
 
   "EE.Features.AwaitingReaction": "Waiting for {user} to answer a reaction prompt…",
 

@@ -29,6 +29,7 @@ import { registerGiftedTracker } from "./daggerheart/gifted-tracker.js";
 import { registerHerbalRemedies } from "./daggerheart/herbal-remedies.js";
 import { registerHoldThemOff } from "./daggerheart/hold-them-off.js";
 import { registerTetheredTalisman } from "./daggerheart/tethered-talisman.js";
+import { registerWitchsCharm } from "./daggerheart/witchs-charm.js";
 import { registerISeeItComing } from "./daggerheart/i-see-it-coming.js";
 import { registerGmEffects } from "./daggerheart/gm-effects.js";
 import { registerGmActionEffects } from "./daggerheart/gm-action-effects.js";
@@ -112,6 +113,11 @@ Hooks.once("init", async () => {
   // asked about the whole roll before being asked about one of its dice.
   registerFelineInstincts();
   registerDualityOutcome();
+  // Its own window, immediately after the duality one and in the same band: both
+  // *rewrite* a Duality roll's outcome, and both have to settle before any window
+  // that merely reads one. Blood Spike below asks whether the cast hit, which is
+  // exactly the question this can change the answer to.
+  registerWitchsCharm();
   registerAdversaryAttack();
   // Its own window rather than a registry feature — one card's rule, not a
   // reaction anything else could join. After `registerDualityOutcome` because

@@ -1486,6 +1486,55 @@ loads).
     conversation. "During a moment of calm" is not enforced; nothing on a sheet
     knows whether the moment qualifies. A GM who dismisses the answer box is not
     chased: narrating it aloud is a legitimate answer.
+- **Witch's Charm** (`src/daggerheart/witchs-charm.ts`) — the Void's Witch class
+  feature, `Compendium.the-void-unofficial.classes.Item.uBQT6rw7mFJubv7e`. World
+  setting `witchsCharm`, **on** by default, filed under Witch beside Commune.
+  - **What the card ships.** One `effect` action, "Spend Hope", whose only
+    content is `cost: [{ key: "hope", value: 3 }]`. `effects` is empty and there
+    is no trigger, so pressing it takes the price and converts nothing — and it
+    could not, because the roll it is about has already posted by the time anyone
+    can reach the button. The card is left exactly as it is, and stays the manual
+    fallback when the setting is off or the roll was never scored.
+  - **A window of its own, not a registry entry.** `feature-registry.ts` looks a
+    feature up on `context.actor`, and this card belongs to somebody *watching*
+    the roll. Nothing else in the game so far reacts to an ally's failed action
+    roll, so a new `FeatureWindow` would have exactly one occupant. Same shape as
+    `blood-spike.ts` and `hold-them-off.ts`: one file, one `registerRollWindow`.
+  - **The seam is `duality-outcome.ts`'s**, for the same reasons — before the
+    chat message, the Fear countdowns, the Hope/Fear grant and the `dualityRoll`
+    /`fearRoll` triggers. Registered immediately after `registerDualityOutcome()`
+    and before every window that only *reads* a result; Blood Spike in particular
+    asks whether the cast hit, which is the answer this changes.
+  - **The success is written onto the number, not onto a flag.**
+    `config.roll.success` is `roll.options.roll.success` (the system passes the
+    config in as the Roll's `options`), so setting it is what the card renders
+    from and what persists. Targets are the harder half: `TargetField.execute`
+    and `DhRollMessage#_getCurrentTargets` both **re-derive** the hit from
+    `difficulty || evasion` against the roll total, on every render — so the
+    target's number is lowered to the roll's own total, the mirror image of
+    `i-see-it-coming.ts` raising Evasion to make an attack miss. The card prints
+    Hit or Miss and never the number behind it, so the change is invisible.
+  - **The Fear half is `setRollDuality`**, exported from `duality-outcome.ts` for
+    this — the persisted `eeDualityOverride` marker and the two patched getters
+    already live there, and a second copy would be one more thing to keep in step
+    with `withHope`/`withFear`. A roll that already failed *with* Fear is left
+    alone rather than overridden to the value it already holds.
+  - **Who is asked.** Every character holding the card who can pay and is close
+    enough — the roller first ("you" needs no measuring), then everyone on the
+    scene in name order, one at a time, **stopping at the first yes**. One charm
+    turns one failure into one success; two players paying 3 Hope for it would be
+    worse than a prompt nobody wanted. The 3 Hope is charged with
+    `modifyResource` on the witch directly, never through `config.resourceUpdates`
+    — that map belongs to the roller.
+  - **Deliberate silences.** A roll the system never scored raises nothing:
+    `config.roll.success` is only filled in when there was a Difficulty entered or
+    a target with a number to beat, and reading its absence as a failure would put
+    a prompt on a witch's screen after every unscored trait roll at the table.
+    Unmeasurable range means no, as everywhere else here. Reaction rolls are not
+    action rolls — the system says so itself by withholding Hope and Fear from
+    them. A multi-target roll that succeeds now hits every target, which costs
+    nothing to reason about because it only read as a failure by missing all of
+    them.
 - **Herbal Remedies** (`src/daggerheart/herbal-remedies.ts`) — the Hedge Witch
   subclass's foundation feature,
   `Compendium.the-void-unofficial.subclasses.Item.pYtLdnmhKmVtxsIM`. World setting
@@ -2359,8 +2408,8 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
     Tracker under Sage, Not Good Enough under Blade, Attack of Opportunity and
-    Slayer under Warrior, Commune, Herbal Remedies and Tethered Talisman under
-    Witch). A subclass
+    Slayer under Warrior, Commune, Witch's Charm, Herbal Remedies and Tethered
+    Talisman under Witch). A subclass
     has no home of
     its own, so its rules are filed under its parent class in a group of their own — Hybrid Form under
     Blood Hunter, Beastbound under Ranger, Slayer (Call of the Slayer) under

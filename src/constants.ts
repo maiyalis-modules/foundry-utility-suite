@@ -286,6 +286,20 @@ export const SETTINGS = {
    */
   communeOracle: "communeOracle",
   /**
+   * Master switch for **Witch's Charm** (Witch, *Void for Daggerheart*): when a
+   * character within Far range fails an action roll, a witch holding the card is
+   * asked whether to spend 3 Hope to turn it into a success with Fear. See
+   * `daggerheart/witchs-charm.ts`.
+   *
+   * World-scoped and **on** by default. World scope is the only coherent answer:
+   * the rule holds one player's roll open to put a question on another player's
+   * screen, and rewrites the Hope, the Fear and the hit that the whole table
+   * reads off one chat card. Switching it off leaves the card's own "Spend Hope"
+   * button doing exactly what the Void ships — taking 3 Hope and changing
+   * nothing — which is the manual fallback either way.
+   */
+  witchsCharm: "witchsCharm",
+  /**
    * Master switch for **Herbal Remedies** (Hedge Witch, *Void for Daggerheart*):
    * a consumable that clears Hit Points or Stress clears one more of them. Not a
    * card that can be pressed — the rule fires on whichever consumable happens to
