@@ -28,6 +28,7 @@ import { registerFelineInstincts } from "./daggerheart/feline-instincts.js";
 import { registerGiftedTracker } from "./daggerheart/gifted-tracker.js";
 import { registerHerbalRemedies } from "./daggerheart/herbal-remedies.js";
 import { registerHoldThemOff } from "./daggerheart/hold-them-off.js";
+import { registerTetheredTalisman } from "./daggerheart/tethered-talisman.js";
 import { registerISeeItComing } from "./daggerheart/i-see-it-coming.js";
 import { registerGmEffects } from "./daggerheart/gm-effects.js";
 import { registerGmActionEffects } from "./daggerheart/gm-action-effects.js";
@@ -167,6 +168,12 @@ Hooks.once("init", async () => {
   // It patches one of the system's action fields directly, and waits for `setup`
   // to do it, so its place in this list is only tidiness.
   registerHerbalRemedies();
+  // Not a roll window either: one card, plus a wrapper on `Actor#takeDamage` that
+  // asks the witch whether to spend a talisman before the marks are written. The
+  // wrapper goes on immediately — `CONFIG.Actor.documentClass` is assigned at
+  // script load — so this must run before anything can be damaged, which `init`
+  // guarantees on its own.
+  registerTetheredTalisman();
   // The single wrapper behind every rule that fires when damage lands. After the
   // features, so every rule they register is already listed — though the patch
   // itself waits for `setup`, so the order is only tidiness.

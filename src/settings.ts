@@ -413,6 +413,22 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // World-scoped, and here more plainly than usual: the rule holds one client's
+  // damage open while it asks a question on another client's screen, so a
+  // per-user answer would make the talisman work or not depending on who pressed
+  // Apply. Nothing is written into prepared data — the next hit reads the new
+  // value — but a talisman already imbued stays on its holder until it is spent
+  // or deleted, which is the same thing switching the feature off mid-session
+  // does to every other standing effect in this module.
+  game.settings.register(MODULE_ID, SETTINGS.tetheredTalisman, {
+    name: "EE.Settings.TetheredTalisman.Name",
+    hint: "EE.Settings.TetheredTalisman.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   // World-scoped for the same reason as Companion, and it shares the mechanism:
   // the action is built during data preparation on every client that prepares the
   // card, so a per-user answer would put a button on one screen and not another.

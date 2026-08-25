@@ -41,7 +41,7 @@ const CLEAR = "gmEffectClear";
  * union rather than a free string is half of why the payload is safe: the GM
  * looks the request up here and refuses anything it does not recognise.
  */
-export type MarkKind = "rangersFocus" | "blightingStrike";
+export type MarkKind = "rangersFocus" | "blightingStrike" | "tetheredTalisman";
 
 /** What a mark request carries. Flat, JSON-safe, and entirely descriptive. */
 export interface MarkRequest {
@@ -69,6 +69,14 @@ const MARKS: Record<MarkKind, { flag: string; nameKey: string; descriptionKey: s
       nameKey: "EE.Features.BlightingStrike.MarkName",
       descriptionKey: "EE.Features.BlightingStrike.MarkDescription",
       img: "icons/magic/unholy/strike-beam-blood-red-purple.webp",
+    },
+    tetheredTalisman: {
+      flag: FLAGS.tetheredTalisman,
+      nameKey: "EE.Features.TetheredTalisman.EffectName",
+      descriptionKey: "EE.Features.TetheredTalisman.EffectDescription",
+      // The Void's own art for the card, so the effect and the feature look like
+      // the same thing on two different sheets.
+      img: "icons/equipment/neck/necklace-simple-carved-arrow.webp",
     },
   };
 

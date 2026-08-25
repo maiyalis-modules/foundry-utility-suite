@@ -299,6 +299,19 @@ export const SETTINGS = {
    */
   herbalRemedies: "herbalRemedies",
   /**
+   * Master switch for **Tethered Talisman** (Hedge Witch, *Void for
+   * Daggerheart*): the card's "Tether" action imbues a target with a talisman
+   * effect, and when that person marks Hit Points the witch is asked whether to
+   * expend it for one fewer. See `daggerheart/tethered-talisman.ts`.
+   *
+   * World-scoped and **on** by default. World scope is the only coherent answer
+   * here for the same reason as {@link SETTINGS.herbalRemedies} and more so: the
+   * rule interrupts one player's damage to put a question on another player's
+   * screen, and half a table running it would mean a talisman that works or does
+   * not depending on who pressed Apply.
+   */
+  tetheredTalisman: "tetheredTalisman",
+  /**
    * Master switch for automating **Close-Knit** (Hearthborne, *Void for
    * Daggerheart*): put a "share Hope" action on a card the Void ships as prose,
    * so a character can spend any number of Hope to hand an ally the same number,
@@ -595,6 +608,21 @@ export const FLAGS = {
    * because the strike is cast by a player at an adversary they cannot write to.
    */
   blightingStrikeMark: "blightingStrikeMark",
+  /**
+   * The **Tethered Talisman** a Hedge Witch has imbued, on the ActiveEffect
+   * carried by whoever is holding it: `{ sourceUuid }`, naming the witch.
+   *
+   * The effect *is* the talisman — there is no second record anywhere, and no
+   * Item. Its presence is what makes the witch's next damage prompt appear, its
+   * absence is what lets her imbue another one, and deleting it from the sheet is
+   * how a table calls the whole thing off. Written by the GM's client on request
+   * (see `daggerheart/gm-effects.ts`), because the holder is usually somebody
+   * else's character.
+   *
+   * Keyed by the *witch* rather than the holder: one talisman per witch is the
+   * rule, and two Hedge Witches can tether the same person.
+   */
+  tetheredTalisman: "tetheredTalisman",
   /**
    * Marks an ActiveEffect as one **Gifted Tracker** tracking, and records what is
    * being tracked: `{ description, hope, quarry: [{ uuid, name, img }] }`.

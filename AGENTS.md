@@ -1547,6 +1547,65 @@ loads).
     card: the bonus shows as the system's own `+1` modifier chip, and the healing
     is folded into the *action's* existing message, so there is not even a
     document of ours to flag.
+- **Tethered Talisman** (`src/daggerheart/tethered-talisman.ts`) — the Hedge
+  Witch subclass's second feature,
+  `Compendium.the-void-unofficial.subclasses.Item.UeY92YRyTAeTPnam`. World
+  setting `tetheredTalisman`, **on** by default, filed under Witch in the same
+  `HedgeWitchLegend` group as Herbal Remedies.
+  - **What the card already does, and is left doing.** One `effect` action,
+    "Tether": `target: { type: "any" }`, `uses: { max: "1", recovery:
+    "shortRest" }`, `effects: []`. The press, the target and the once-per-rest
+    bookkeeping are all the system's — `UsesField` refuses the second press by
+    itself — so none of it is reimplemented. Only the three things the card can't
+    do are here: imbuing something, asking when the holder is hit, and warning
+    before a second talisman cancels a first.
+  - **No talisman Item.** The talisman is an ActiveEffect on the holder, flagged
+    `FLAGS.tetheredTalisman` with the witch's uuid, placed through
+    `gm-effects.ts` (the holder is usually somebody else's character, and core
+    requires OWNER of the parent to create an ActiveEffect). The effect *is* the
+    record — spending it deletes it, deleting it by hand calls the feature off,
+    and its absence is what lets another be imbued. Keyed by *witch*, not holder,
+    so two Hedge Witches can tether the same person.
+  - **The reduction is on the marks, not the damage.** Thresholds mean the two
+    are not interchangeable: against a Major of 8, 8 damage marks 2 and 7 marks
+    1, so the same subtraction is worth a whole Hit Point at one number and
+    nothing at another. `Actor#takeDamage` is therefore wrapped, and for the
+    length of one call on one actor its `modifyResource` is shadowed by an own
+    property — a one-shot that sees the finished `{ key: "hitPoints", value }`
+    entry (after resistances, thresholds and the armor-slot dialog) and takes one
+    off it before the write. The shadow restores itself first thing, so nothing
+    later in the same call is intercepted, and the outer `finally` restores again
+    (idempotent) if `takeDamage` throws.
+  - **Why not the hooks, and why not healing it back.** `preTakeDamage` and
+    `postCalculateDamage` both fire while the value is still raw damage, before
+    `convertDamageToThreshold`; `postTakeDamage` fires after `modifyResource` has
+    written the sheet. Applying and then healing a point back is not merely
+    cosmetic: marking your last Hit Point is a death move, so a character taken
+    to zero and quietly refilled has already had the system's attention.
+  - **It holds the damage open, on the system's own precedent.** The prompt goes
+    to the witch over `feature-ask.ts`'s socket with its usual timeout, so
+    `takeDamage` waits on another client. `Actor#takeDamage` already does this
+    three lines earlier — `this.owner.query('armorSlot', …, { timeout: 30000 })`
+    — and the wait only ever happens when a live talisman is on the person who
+    was actually hit.
+  - **The witch is asked, not the person hit.** `responderFor(witch)`, falling
+    back to the client running the damage when nobody who owns her is connected.
+    Spending the talisman is her decision and the only interesting one in the
+    feature; a player about to mark two Hit Points always says yes.
+  - **Replacing is a warning, not a refusal.** Raised from `preUseAction` —
+    before the use is spent — by returning `false` and replaying the press with
+    `event.eeTetheredTalisman` on a yes, the same cancel-and-replay
+    `rangers-focus.ts` hands to the Target Helper. A synchronous hook cannot
+    await a dialog, and asking after the use would be asking after the cost. The
+    no-target refusal is raised there too, for the same reason: `prepareConfig`
+    has already run when `preUseAction` fires, so the target is known while the
+    press is still free.
+  - **Deliberate silences.** A hit that marks no Hit Points raises no prompt and
+    spends nothing. Stress is never reduced, and a Stress-only hit does not ask.
+    Direct damage is included — it bypasses armor, not talismans. The world scan
+    for an outstanding talisman covers `game.actors` plus the current scene's
+    unlinked token actors; one on an unlinked token on another scene is not
+    found, and the only cost is a warning that stays quiet.
 - **Companion** (`src/daggerheart/companion.ts`) — the Beastbound subclass's
   foundation card, made pressable. World setting `companionCommands`, **on** by
   default, filed under Ranger with its own `BeastboundLegend` group (same rule as
@@ -2300,7 +2359,8 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
     Tracker under Sage, Not Good Enough under Blade, Attack of Opportunity and
-    Slayer under Warrior, Commune and Herbal Remedies under Witch). A subclass
+    Slayer under Warrior, Commune, Herbal Remedies and Tethered Talisman under
+    Witch). A subclass
     has no home of
     its own, so its rules are filed under its parent class in a group of their own — Hybrid Form under
     Blood Hunter, Beastbound under Ranger, Slayer (Call of the Slayer) under

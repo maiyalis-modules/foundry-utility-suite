@@ -347,6 +347,11 @@ const CLASSES: Catalog = {
               name: "EE.Settings.HerbalRemedies.Name",
               hint: "EE.Settings.HerbalRemedies.Hint",
             },
+            {
+              key: SETTINGS.tetheredTalisman,
+              name: "EE.Settings.TetheredTalisman.Name",
+              hint: "EE.Settings.TetheredTalisman.Hint",
+            },
           ],
         },
       ],
