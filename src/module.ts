@@ -26,6 +26,7 @@ import { registerFearless } from "./daggerheart/fearless.js";
 import { registerFeatureAsk } from "./daggerheart/feature-ask.js";
 import { registerFelineInstincts } from "./daggerheart/feline-instincts.js";
 import { registerGiftedTracker } from "./daggerheart/gifted-tracker.js";
+import { registerHerbalRemedies } from "./daggerheart/herbal-remedies.js";
 import { registerHoldThemOff } from "./daggerheart/hold-them-off.js";
 import { registerISeeItComing } from "./daggerheart/i-see-it-coming.js";
 import { registerGmEffects } from "./daggerheart/gm-effects.js";
@@ -161,6 +162,11 @@ Hooks.once("init", async () => {
   // action has already resolved. It hooks `postUseAction` and a socket of its
   // own, so its place in this list costs nothing.
   registerCommune();
+  // Not a roll window either, and not a card that can be pressed at all: a
+  // passive rule that raises a consumable's healing formula before it is rolled.
+  // It patches one of the system's action fields directly, and waits for `setup`
+  // to do it, so its place in this list is only tidiness.
+  registerHerbalRemedies();
   // The single wrapper behind every rule that fires when damage lands. After the
   // features, so every rule they register is already listed — though the patch
   // itself waits for `setup`, so the order is only tidiness.

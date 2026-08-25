@@ -335,6 +335,20 @@ const CLASSES: Catalog = {
             },
           ],
         },
+        {
+          // Herbal Remedies is the Hedge Witch subclass's foundation feature, and
+          // a subclass has nowhere of its own here — the same filing as Hybrid
+          // Form under Blood Hunter, Beastbound under Ranger and Call of the
+          // Slayer under Warrior.
+          legend: "EE.Automation.HedgeWitchLegend",
+          settings: [
+            {
+              key: SETTINGS.herbalRemedies,
+              name: "EE.Settings.HerbalRemedies.Name",
+              hint: "EE.Settings.HerbalRemedies.Hint",
+            },
+          ],
+        },
       ],
     },
   ],

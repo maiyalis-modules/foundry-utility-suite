@@ -286,6 +286,19 @@ export const SETTINGS = {
    */
   communeOracle: "communeOracle",
   /**
+   * Master switch for **Herbal Remedies** (Hedge Witch, *Void for Daggerheart*):
+   * a consumable that clears Hit Points or Stress clears one more of them. Not a
+   * card that can be pressed — the rule fires on whichever consumable happens to
+   * be drunk, so the +1 is added to that consumable's formula before it is
+   * rolled. See `daggerheart/herbal-remedies.ts`.
+   *
+   * World-scoped and **on** by default, and here world scope is the only
+   * coherent answer rather than a house style: the rule changes a number a chat
+   * card prints for the whole table, so a per-user preference would have two
+   * people reading different totals off the same potion.
+   */
+  herbalRemedies: "herbalRemedies",
+  /**
    * Master switch for automating **Close-Knit** (Hearthborne, *Void for
    * Daggerheart*): put a "share Hope" action on a card the Void ships as prose,
    * so a character can spend any number of Hope to hand an ally the same number,

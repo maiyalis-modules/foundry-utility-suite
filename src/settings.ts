@@ -399,6 +399,20 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // World-scoped, and not merely for consistency: this changes a number a chat
+  // card prints for the whole table, so a per-user answer would have two people
+  // reading different totals off the same potion. Nothing is written into
+  // prepared data, so no reconciliation is needed — the next consumable pressed
+  // reads the new value.
+  game.settings.register(MODULE_ID, SETTINGS.herbalRemedies, {
+    name: "EE.Settings.HerbalRemedies.Name",
+    hint: "EE.Settings.HerbalRemedies.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   // World-scoped for the same reason as Companion, and it shares the mechanism:
   // the action is built during data preparation on every client that prepares the
   // card, so a per-user answer would put a button on one screen and not another.

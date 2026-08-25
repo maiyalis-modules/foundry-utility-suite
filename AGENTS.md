@@ -1486,6 +1486,67 @@ loads).
     conversation. "During a moment of calm" is not enforced; nothing on a sheet
     knows whether the moment qualifies. A GM who dismisses the answer box is not
     chased: narrating it aloud is a legitimate answer.
+- **Herbal Remedies** (`src/daggerheart/herbal-remedies.ts`) — the Hedge Witch
+  subclass's foundation feature,
+  `Compendium.the-void-unofficial.subclasses.Item.pYtLdnmhKmVtxsIM`. World setting
+  `herbalRemedies`, **on** by default, filed under Witch in its own
+  `HedgeWitchLegend` group (same rule as Beastbound under Ranger).
+  - **Nothing is built on the card, and nothing could be.** `actions: {}`,
+    `resource: null`. The rule fires on somebody else's button — whichever
+    consumable happens to get drunk — so there is no action to derive and no
+    prompt to raise. One number changes, in the one place it is still changeable.
+  - **The +1 goes on the formula, before the roll.** `DamageField.formatFormulas`
+    is wrapped at `setup` (`game.system.api.fields.ActionFields.DamageField` — the
+    same object `damage-landing.ts` patches, a different method). It returns a
+    fresh array of `{ formula, applyTo, fullRestore }` on every call, already
+    merged by `applyTo` and stored nowhere, and it is called with the *action* as
+    `this`, which is what lets the rule tell a consumable's healing from any
+    other. `" + 1"` is appended to the string: these are additive expressions
+    (`1d4`, `1d4 + 2`, `@system.resources.stress.max`), so the shape being
+    extended does not matter.
+  - **Why not the three other seams.** `daggerheart.preTakeHealing` is the most
+    literal reading of "the number cleared" and hands over a plain
+    `{ key, value }[]` — by which point `Actor#parseDamageArgs` has discarded
+    where the healing came from, so there is no consumable left to recognise (the
+    same wall `blighting-strike.ts` hit with `preTakeDamage`). `applyDamage`
+    (`damage-landing.ts`) still knows the source and runs after the card is
+    posted, so the card would read 2 while the sheet moved 3. Writing
+    `roll._total` has that problem plus dice that no longer sum to their own
+    total.
+  - **`system.bonuses.healing` is a dead field.** Declared on the character
+    schema, read nowhere in the 2.7.2 bundle: `DamageRoll.applyBaseBonus` returns
+    early for anything with `hasHealing`, and `constructFormula` consults
+    `config.modifiers` only for the main damage part, never for a resource. No
+    ActiveEffect can reach a healing formula — don't go looking for one again.
+  - **Healing consumables never auto-apply.** Every one the SRD ships has
+    `target.type: ""`, so `applyDamage` returns with nobody to apply to and the
+    number gets read off the card and marked by hand. That is the argument for
+    raising the formula rather than the applied total: at most tables the reading
+    *is* the applying.
+  - **Only `hitPoints` and `stress`, and never a `fullRestore`.** Hope (Varik
+    Leaves) and Armor Slots (Armor Stitcher) are not what the card names, and a
+    full restore has no number to raise — the system swaps its formula for `"0"`
+    and clears the resource off the flag instead. Consumables that *deal* damage
+    (Dripfang Poison, the Arcane Shards) are kept out by `hasHealing`, which is
+    false unless `action.type === "healing"`.
+  - **"You or an ally" is read loosely on purpose**: the user is a `character`,
+    and some `character` in the world has the card. "Assigned to a player" and
+    `hasPlayerOwner` both fail where the GM owns every sheet; "same scene" fails
+    between sessions, which is when potions get drunk. Said out loud in the
+    setting hint, including the case it gets wrong (a rival party in the same
+    world). The check reads *who used it*, not who is healed, and cannot do
+    otherwise — a consumable declares no target, so at formula time there is no
+    recipient yet.
+  - **The world scan is uncached**, deliberately: a few times a session against a
+    list matched in microseconds, versus a cache needing invalidation on item
+    create/delete, actor import and compendium sync.
+  - **Deliberate silences.** A consumable clearing both Hit Points and Stress
+    (none ship) is raised on each — the card does not say which number when there
+    are two. "Clear *one or more*" is not enforced, since the raise happens before
+    the roll; no shipped formula can come up zero. Nothing is added to the chat
+    card: the bonus shows as the system's own `+1` modifier chip, and the healing
+    is folded into the *action's* existing message, so there is not even a
+    document of ours to flag.
 - **Companion** (`src/daggerheart/companion.ts`) — the Beastbound subclass's
   foundation card, made pressable. World setting `companionCommands`, **on** by
   default, filed under Ranger with its own `BeastboundLegend` group (same rule as
@@ -2239,10 +2300,11 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
     Tracker under Sage, Not Good Enough under Blade, Attack of Opportunity and
-    Slayer under Warrior, Commune under Witch). A subclass has no home of
+    Slayer under Warrior, Commune and Herbal Remedies under Witch). A subclass
+    has no home of
     its own, so its rules are filed under its parent class in a group of their own — Hybrid Form under
     Blood Hunter, Beastbound under Ranger, Slayer (Call of the Slayer) under
-    Warrior. All four
+    Warrior, Hedge Witch under Witch. All four
     content tabs render
     the *same* template from data in `src/apps/automation-catalog.ts`, so adding a
     switch is one `CatalogSetting` in the right entry's `groups`. `settingKeys` is
