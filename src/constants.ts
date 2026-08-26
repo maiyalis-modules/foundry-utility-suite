@@ -216,6 +216,24 @@ export const SETTINGS = {
    */
   notThisTimeReroll: "notThisTimeReroll",
   /**
+   * Master switch for automating **Strange Patterns** (Wizard, SRD p.25): teach
+   * the card *when* its number may be chosen. The matching itself is the
+   * system's — the SRD card ships a `dualityRoll` trigger that already counts
+   * the dice and hands out the Hope or the Stress clear — and this governs only
+   * the number behind it: pressing the card chooses it while it is unset,
+   * the long rest dialog grows a control for changing it, and every other route
+   * to the field is refused in between. See `daggerheart/strange-patterns.ts`.
+   *
+   * World-scoped, and here for a plainer reason than the reaction switches: this
+   * one decides whether a write to a sheet is allowed, and a per-client answer
+   * would let the same edit be refused on one screen and accepted on another.
+   * **On** by default like the rest.
+   *
+   * Off restores the card exactly as it shipped, including the free Stress clear
+   * its vestigial button hands out — see the file header.
+   */
+  strangePatternsNumber: "strangePatternsNumber",
+  /**
    * Master switch for automating **Hold Them Off** (Ranger): after a successful
    * weapon attack, offer to spend 3 Hope and add up to two more adversaries
    * within the attack's range to the roll that already happened — before the

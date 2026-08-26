@@ -2168,6 +2168,57 @@ loads).
     both would be charged for one reroll. Both gate on `rerollRequested`, and
     `stillOffered` is what makes that gate hold after the prompt as well as before
     it.
+- **Strange Patterns** (`src/daggerheart/strange-patterns.ts`) — the Wizard's
+  (SRD p.25) "Choose a number between 1 and 12. When you roll that number on a
+  Duality Die, gain a Hope or clear a Stress. You can change this number when you
+  take a long rest." `Compendium.daggerheart.classes.Item.6YsfFjmCGuFYVhT4`.
+  World setting `strangePatternsNumber`, **on** by default, filed under
+  **Classes → Wizard**.
+  - **The system already does the matching, and this file does not touch it.**
+    The SRD card's one action carries a `dualityRoll` trigger whose script reads
+    both dice, counts how many show the chosen number, and opens a dialog to split
+    that many rewards between Hope gained and Stress cleared. It works. What the
+    system ships no rule for is the **number** — the only way to set one is the
+    d12 widget on the card's sheet row (`ResourceDiceDialog`), a free-form field
+    available to any owner at any moment, including the moment a Duality roll is
+    sitting on the table showing a number worth having.
+  - **The number stays where the system put it**: an item resource of type
+    `diceValue`, at `item.system.resource.diceStates["0"].value`, written as a
+    whole-object replacement the way `#handleResourceDice` writes it. A flag of
+    our own would look identical on the sheet and quietly stop the shipped trigger
+    working, since that is the field it reads.
+  - **One rule, three doors.** Pressing the card chooses the number while it is
+    unset (`preUseAction`, cancelled — see below) and otherwise answers "what is
+    my number?"; the system's long rest dialog grows a fieldset with the number
+    and a change button (`renderDhpDowntime`, injected before the template's
+    `<footer>`, short rests skipped); and `preUpdateItem` refuses every other
+    route in between. The lock is what makes the first two mean anything, and it
+    is deliberately a rule about the *field* rather than about the doors, so a
+    route the system grows later is covered too. A house rule, not a security
+    boundary, exactly as `deck-limit-guard.ts` is.
+  - **`used` is excluded from the lock.** A `diceStates` entry has two fields
+    written by two different buttons: clicking the die toggles `used` (the spent
+    X), and only the dice-icon dialog writes `value`. Refusing the first with a
+    message about long rests would read as the card being broken — and `used`
+    carries no meaning for this card anyway, since the trigger reads `value` and
+    nothing else.
+  - **The press is cancelled, not adjusted.** The action is `healing`-typed with
+    a `stress` part of `1`, so the shipped button clears a Stress every press, for
+    free and unconditionally. That payload is vestigial — the trigger returns its
+    own `{ updates }` and never uses it — so the button is taken over whole.
+    Turning the setting off restores the card as it shipped, free Stress clear
+    included, which is the honest thing for a switch to mean.
+  - **The rest *window*, not the rest, is what unlocks it.** Open long rest
+    dialogs are tracked in a local `Set` keyed by actor uuid (`renderDhpDowntime`
+    adds, `closeDhpDowntime` removes) rather than read out of Foundry's
+    application registry, so "is this character resting?" has one answer from one
+    source and the lock never has to name a system class to ask it. The dialog
+    opens on the owner's own client (`downtimeMoveQuery` checks `isOwner`), which
+    is the same client the sheet writes from, so a local set is the right scope.
+    Changing the number more than once while that window is up is left possible.
+  - **The GM is exempt from the lock outright.** Somebody has to be able to fix a
+    number typed wrong three sessions ago, and a confirmation dialog on every GM
+    edit would put a question in front of the one person who cannot be cheating.
 - **Attack of Opportunity** (`src/daggerheart/attack-of-opportunity.ts`) — the
   Warrior's (SRD p.23) "If an adversary within Melee range attempts to leave that
   range, make a reaction roll using a trait of your choice against their
@@ -2716,7 +2767,8 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Crimson Rite and Hybrid Form under Blood Hunter; Hold Them Off, Ranger's
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
-    Tracker under Sage, Not Good Enough under Blade, Not This Time under Wizard,
+    Tracker under Sage, Not Good Enough under Blade, Not This Time and Strange
+    Patterns under Wizard,
     Attack of Opportunity and
     Slayer under Warrior, Commune, Witch's Charm, Hex, Herbal Remedies and
     Tethered Talisman under Witch). A subclass

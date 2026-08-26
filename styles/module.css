@@ -1135,3 +1135,43 @@
    * they put in should survive into the card. */
   white-space: pre-wrap;
 }
+
+/* Strange Patterns' number, in the system's long rest dialog.
+ *
+ * The block sits in the downtime window between the refreshables fieldset and
+ * the footer, so it borrows that dialog's own `fieldset`/`legend` chrome rather
+ * than bringing its own: the point is that it reads as part of the rest, not as
+ * something a module bolted on. Only the row inside it is laid out here.
+ *
+ * The number is set large and in the dialog's own accent because it is the one
+ * piece of information the block exists to show — a player opening a long rest
+ * should be able to see what they picked without reading a sentence. */
+.ee-strange-patterns .ee-strange-patterns-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ee-strange-patterns .ee-strange-patterns-number {
+  flex: 0 0 auto;
+  min-width: 1.8rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--golden-40, rgb(243 194 103 / 25%));
+  border-radius: 5px;
+  font-size: 1.3rem;
+  font-weight: bold;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--golden, #f3c267);
+}
+
+/* Takes the slack so the button stays hard against the right edge, under the
+ * dialog's own confirm button. */
+.ee-strange-patterns .ee-strange-patterns-label {
+  flex: 1 1 auto;
+}
+
+.ee-strange-patterns .ee-strange-patterns-change {
+  flex: 0 0 auto;
+  width: auto;
+}

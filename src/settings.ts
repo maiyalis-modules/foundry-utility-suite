@@ -279,6 +279,18 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // World-scoped for a reason of its own: this one decides whether an edit to a
+  // sheet is refused, and a per-client answer would let the same change be
+  // blocked on the player's screen and waved through on the GM's.
+  game.settings.register(MODULE_ID, SETTINGS.strangePatternsNumber, {
+    name: "EE.Settings.StrangePatternsNumber.Name",
+    hint: "EE.Settings.StrangePatternsNumber.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   // World-scoped like the others, and for a further reason: this one decides
   // whether an ActiveEffect gets written to a sheet, and a per-client answer
   // would let one player's rite exist and another's not. Read at activation and

@@ -299,6 +299,11 @@ const CLASSES: Catalog = {
               name: "EE.Settings.NotThisTimeReroll.Name",
               hint: "EE.Settings.NotThisTimeReroll.Hint",
             },
+            {
+              key: SETTINGS.strangePatternsNumber,
+              name: "EE.Settings.StrangePatternsNumber.Name",
+              hint: "EE.Settings.StrangePatternsNumber.Hint",
+            },
           ],
         },
       ],

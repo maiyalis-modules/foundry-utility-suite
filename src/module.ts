@@ -42,6 +42,7 @@ import { registerNotThisTime } from "./daggerheart/not-this-time.js";
 import { registerRangersFocus } from "./daggerheart/rangers-focus.js";
 import { registerReach } from "./daggerheart/reach.js";
 import { reconcileSlayerCards, registerSlayer } from "./daggerheart/slayer.js";
+import { registerStrangePatterns } from "./daggerheart/strange-patterns.js";
 import { installRollPipeline } from "./daggerheart/roll-pipeline.js";
 import { registerViciousEntangle } from "./daggerheart/vicious-entangle.js";
 import { registerHotbarPages } from "./hotbar/hotbar-pages.js";
@@ -185,6 +186,11 @@ Hooks.once("init", async () => {
   // action has already resolved. It hooks `postUseAction` and a socket of its
   // own, so its place in this list costs nothing.
   registerCommune();
+  // Not a roll window either, and the only feature here that automates *when* a
+  // card may be edited rather than what a roll does: the SRD ships the matching
+  // half of this one already. It hooks `preUseAction`, the system's rest dialog
+  // and `preUpdateItem`, so it takes no part in any ordering.
+  registerStrangePatterns();
   // Not a roll window either, and not a card that can be pressed at all: a
   // passive rule that raises a consumable's healing formula before it is rolled.
   // It patches one of the system's action fields directly, and waits for `setup`
