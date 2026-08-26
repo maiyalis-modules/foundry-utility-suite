@@ -124,6 +124,8 @@
   "EE.Settings.TetheredTalisman.Name": "Tethered Talisman",
   "EE.Settings.TetheredTalisman.Hint": "Make the Void's Hedge Witch subclass feature \"Tethered Talisman\" do what it says. The card ships a \"Tether\" action that spends its once-per-rest use, asks for a target and then does nothing at all: its effect list is empty. With this on, pressing it with one token targeted puts a talisman effect on that person, and from then on, whenever they would mark Hit Points, the question goes to you rather than to them — expend the talisman to mark one fewer, or save it. The reduction happens before anything is written to their sheet, which matters when the Hit Point in question is their last one. The prompt times out after half a minute and the damage lands as rolled, and it only ever appears when a live talisman is on the person who was actually hit, so nobody's turn is held up by a feature that is sitting idle. Spending the talisman removes it, which is what frees you to imbue another; so does deleting the effect from their sheet, which is how to call the whole thing off. Pressing the card while your last talisman is still out warns you first, and cancels the press if you decline, so nothing is spent by accident — the card's own once-per-rest bookkeeping is left entirely to the system. Only Hit Points are reduced: an attack that also marks Stress marks all of it, and one that marks Stress alone raises no prompt at all.",
 
+  "EE.Settings.BraveFace.Name": "Brave Face",
+  "EE.Settings.BraveFace.Hint": "Make the Void's Warborne community feature \"Brave Face\" do what it says. The card ships as description only, and the rule has no moment you could press it at: it fires inside somebody else's attack, after the damage is worked out and before your sheet is written. With this on, an attack that would make you mark a Stress asks you first — spend a Hope instead, or take the Stress. Say yes and the Stress is never marked at all, which is the whole point when your track is already full: the system turns an unmarkable Stress into a Hit Point, and this gets in ahead of that. The once-per-session use is a counter the module puts on the card itself, so you can see whether it's still there, and the system's own end-of-session refresh clears it — tick Session in the Daggerheart sidebar's refresh, the same button that clears everything else. An attack that would mark more than one Stress swaps one of them; the card says \"a Stress\". The prompt waits half a minute and then lets the attack through unchanged, and nothing is spent unless you say yes.",
   "EE.Settings.CloseKnitShareHope.Name": "Close-Knit",
   "EE.Settings.CloseKnitShareHope.Hint": "Put a \"Share Hope\" button on the Void's Hearthborne \"Close-Knit\" card, which ships as description only. Press it and you're asked who receives — every character assigned to a player, plus anyone standing on the current scene, each shown with the Hope they're already holding — and then how much of your own Hope to hand over. Nothing is spent until both questions are answered, so backing out of either costs you nothing. The Hope moves straight onto the other sheet, which needs a GM connected, the same as marking an adversary's Stress does. Using it puts a \"Close-Knit (spent)\" effect on your sheet that the system clears at your next long rest; delete it by hand to give the use back. Giving more Hope than an ally can hold spends all of it and says so — the card says any number, and the system caps every resource on the way in.",
   "EE.Settings.AttackOfOpportunity.Name": "Attack of Opportunity",
@@ -243,6 +245,17 @@
   "EE.Features.Hex.LiftNoTrait": "{witch} has no Spellcast trait, so the rule names no price. Delete the effect from the creature to lift the Hex.",
   "EE.Features.Hex.LiftNoFear": "Lifting this Hex costs {price} Fear, and there is {fear}. Nothing was spent.",
   "EE.Features.Hex.Lifted": "{price} Fear is spent: {witch}'s hex on {creature} is lifted.",
+
+  "EE.Features.BraveFace.Title": "Brave Face",
+  "EE.Features.BraveFace.Intro": "{attacker}'s attack would make you mark a Stress.",
+  "EE.Features.BraveFace.IntroMany": "{attacker}'s attack would make you mark {marks} Stress. Brave Face covers one of them.",
+  "EE.Features.BraveFace.Verdict": "{marks} Stress",
+  "EE.Features.BraveFace.UnknownSource": "An attack",
+  "EE.Features.BraveFace.Label": "Spend a Hope instead",
+  "EE.Features.BraveFace.Hint": "Once per session. You are holding {hope} Hope.",
+  "EE.Features.BraveFace.Spend": "Spend a Hope",
+  "EE.Features.BraveFace.Mark": "Mark the Stress",
+  "EE.Features.BraveFace.Announce": "{actor} puts on a brave face — spending a Hope rather than marking a Stress from {attacker}.",
 
   "EE.Features.TimeRemaining": "Time remaining",
   "EE.Features.TimeRemainingSeconds": "{seconds}s",

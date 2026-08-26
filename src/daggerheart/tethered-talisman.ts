@@ -29,16 +29,13 @@
  * Major of 8 marks 2, and 7 marks 1 — the same subtraction is worth a whole Hit
  * Point at one number and nothing at all at another.
  *
- * So the seam is `Actor#takeDamage`, which is the one place the mark count is a
- * number in hand. Its own hooks are all in the wrong place for this:
- * `preTakeDamage` and `postCalculateDamage` both fire while the value is still
- * raw damage, before `convertDamageToThreshold` has run, and `postTakeDamage`
- * fires after `modifyResource` has already written the sheet. This therefore
- * wraps `takeDamage` and, for the duration of that one call on that one actor,
- * shadows its `modifyResource` with a one-shot that sees the finished update list
- * — the same `{ key: "hitPoints", value }` entry the system is about to apply,
+ * So the seam is the finished update list `Actor#takeDamage` hands to
+ * `modifyResource`, which is the one place the mark count is a number in hand —
+ * the same `{ key: "hitPoints", value }` entry the system is about to apply,
  * after resistances, after thresholds, and after the armor-slot dialog has taken
- * its own point off. The talisman changes that number and hands it on.
+ * its own point off. The talisman changes that number and hands it on. Getting
+ * there is `damage-marking.ts`'s job, and its header says why the method's own
+ * hooks are all in the wrong place for this.
  *
  * The alternative — let the damage land and heal a point back — was rejected for
  * a reason that is not cosmetic. Marking your last Hit Point is a death move; a
@@ -50,12 +47,10 @@
  * The prompt goes to the *witch*, who is usually not the person being hit and is
  * very often not the client applying the damage, so it crosses a socket
  * (`feature-ask.ts`) and it waits. That means `takeDamage` is held open while
- * somebody else decides — which sounds unacceptable until you notice the system
- * does exactly this, in this method, three lines earlier: `this.owner.query
- * ('armorSlot', …, { timeout: 30000 })` stops the same damage dead while the
- * damaged player chooses whether to spend armor. The precedent is the system's
- * own, the timeout is `feature-ask.ts`'s, and the wait only ever happens when
- * there is a live talisman on the person who was actually hit.
+ * somebody else decides — see `damage-marking.ts` on why that is the system's own
+ * precedent rather than a liberty. The wait only ever happens when there is a
+ * live talisman on the person who was actually hit, which is what this feature's
+ * `wants` answers.
  *
  * ## Who is asked
  *
@@ -96,6 +91,7 @@
  *   the same person, and each spends her own.
  */
 import { FLAGS, LOG_PREFIX, MODULE_ID, SETTINGS } from "../constants.js";
+import { onDamageMarking } from "./damage-marking.js";
 import { askUser, responderFor } from "./feature-ask.js";
 import { confirmChoice, type PromptRequest } from "./feature-prompt.js";
 import { findGrantingItem, type FeatureMatch } from "./feature-registry.js";
@@ -352,18 +348,21 @@ async function announce(witch: AnyObject, holder: AnyObject): Promise<void> {
  * change is made in place. The sign is read rather than assumed: Hit Points are a
  * *reversed* resource and so arrive positive, but the whole point of reading
  * `isReversed` elsewhere in this module is not to hardcode that.
+ *
+ * The talisman is looked up here rather than captured when the rule said it
+ * wanted this actor: those two moments are the armor-slot dialog apart, and the
+ * later one is the truer answer.
  */
-async function offerTalisman(
-  holder: AnyObject,
-  effect: AnyObject,
-  resources: AnyObject[],
-): Promise<void> {
+async function offerTalisman(holder: AnyObject, resources: AnyObject[]): Promise<void> {
   const entry = (resources ?? []).find((update) => String(update?.["key"] ?? "") === HIT_POINTS);
   const marking = Math.abs(Number(entry?.["value"] ?? 0));
 
   // No Hit Points, no number to reduce. The talisman is not spent and the witch
   // is not interrupted.
   if (!entry || !Number.isFinite(marking) || marking < REDUCE) return;
+
+  const effect = talismanOn(holder);
+  if (!effect) return;
 
   const mark = talismanFlag(effect);
   const witch = fromUuidSync(String(mark?.["sourceUuid"] ?? "")) as AnyObject | null;
@@ -401,94 +400,19 @@ async function offerTalisman(
 }
 
 /* ------------------------------------------------------------------ *
- * The patch
- * ------------------------------------------------------------------ */
-
-/**
- * Shadow this actor's `modifyResource` for the length of one `takeDamage`, and
- * answer with the function that puts it back.
- *
- * An own property on the instance rather than a patch on the prototype: the
- * interception is meant to last for one call on one actor, and shadowing says
- * exactly that. Restoring is idempotent, so the one-shot inside and the `finally`
- * outside can both call it.
- */
-function interpose(holder: AnyObject): (() => void) | null {
-  const effect = talismanOn(holder);
-  if (!effect) return null;
-
-  const owned = Object.prototype.hasOwnProperty.call(holder, "modifyResource");
-  const previous = holder["modifyResource"];
-
-  const restore = (): void => {
-    if (owned) holder["modifyResource"] = previous;
-    else delete holder["modifyResource"];
-  };
-
-  holder["modifyResource"] = async function (resources: AnyObject[]): Promise<unknown> {
-    // Before anything else: the talisman answers the damage it was interposed
-    // for, and nothing the rest of this call may go on to write.
-    restore();
-
-    try {
-      await offerTalisman(holder, effect, resources);
-    } catch (error) {
-      // The damage lands either way; a broken talisman must not eat the hit.
-      console.warn(`${LOG_PREFIX} ${LABEL}: could not offer the talisman.`, error);
-    }
-
-    // Resolved off the actor again, which is the original method now that the
-    // shadow has been removed.
-    return holder["modifyResource"](resources);
-  };
-
-  return restore;
-}
-
-/**
- * Wrap `Actor#takeDamage`.
- *
- * Patched during `init`: the system assigns `CONFIG.Actor.documentClass` at
- * script load, before any `init` hook, and nothing can be damaged before the
- * canvas exists. Same reasoning as `reach.ts`.
- */
-function patchTakeDamage(): void {
-  const prototype = CONFIG.Actor?.documentClass?.["prototype"] as AnyObject | undefined;
-  const original = prototype?.["takeDamage"];
-
-  if (typeof original !== "function") {
-    console.warn(`${LOG_PREFIX} ${LABEL}: no takeDamage to wrap — the talisman cannot be spent.`);
-    return;
-  }
-
-  prototype!["takeDamage"] = async function (
-    this: AnyObject,
-    args: unknown,
-    isDirect = false,
-  ): Promise<unknown> {
-    let restore: (() => void) | null = null;
-
-    try {
-      if (enabled()) restore = interpose(this);
-    } catch (error) {
-      console.warn(`${LOG_PREFIX} ${LABEL}: could not look for a talisman.`, error);
-    }
-
-    try {
-      return await original.call(this, args, isDirect);
-    } finally {
-      restore?.();
-    }
-  };
-}
-
-/* ------------------------------------------------------------------ *
  * Wiring
  * ------------------------------------------------------------------ */
 
 /** Wire the feature up. Called once during `init`. */
 export function registerTetheredTalisman(): void {
-  patchTakeDamage();
+  // `wants` keeps the shared seam from interposing on anyone who is not carrying
+  // a talisman, which is nearly everyone: the check is one pass over an actor's
+  // effects, and answering false costs the damage nothing at all.
+  onDamageMarking({
+    id: FEATURE_ID,
+    wants: (holder) => enabled() && talismanOn(holder) !== null,
+    mark: (holder, resources) => offerTalisman(holder, resources),
+  });
 
   Hooks.on("daggerheart.preUseAction", (action: AnyObject, config: AnyObject): boolean | void => {
     try {

@@ -14,7 +14,9 @@ import { registerAdversaryAttack } from "./daggerheart/adversary-attack.js";
 import { registerAttackOfOpportunity } from "./daggerheart/attack-of-opportunity.js";
 import { registerBloodMaledict } from "./daggerheart/blood-maledict.js";
 import { registerBlightingStrike } from "./daggerheart/blighting-strike.js";
+import { reconcileBraveFaceCards, registerBraveFace } from "./daggerheart/brave-face.js";
 import { registerDamageLanding } from "./daggerheart/damage-landing.js";
+import { registerDamageMarking } from "./daggerheart/damage-marking.js";
 import { registerBloodSpike } from "./daggerheart/blood-spike.js";
 import { registerCardTargeting } from "./daggerheart/card-targeting.js";
 import { registerCloseKnit } from "./daggerheart/close-knit.js";
@@ -175,12 +177,15 @@ Hooks.once("init", async () => {
   // It patches one of the system's action fields directly, and waits for `setup`
   // to do it, so its place in this list is only tidiness.
   registerHerbalRemedies();
-  // Not a roll window either: one card, plus a wrapper on `Actor#takeDamage` that
-  // asks the witch whether to spend a talisman before the marks are written. The
-  // wrapper goes on immediately — `CONFIG.Actor.documentClass` is assigned at
-  // script load — so this must run before anything can be damaged, which `init`
-  // guarantees on its own.
+  // Not a roll window either: one card, plus a rule on the shared `takeDamage`
+  // seam that asks the witch whether to spend a talisman before the marks are
+  // written.
   registerTetheredTalisman();
+  // Not a roll window either: no card to press at all, only a rule on that same
+  // seam. Registered after the talisman so it sees the marks the talisman has
+  // already reduced — which matters in exactly one direction, since a hit the
+  // talisman softened still marks whatever Stress it came with.
+  registerBraveFace();
   // Not a roll window either, and its two halves sit on either side of the one
   // above: a rule on the shared `applyDamage` wrapper notes who is about to hurt
   // whom, and `postTakeDamage` then asks whether to hex them — which is *after*
@@ -192,6 +197,11 @@ Hooks.once("init", async () => {
   // features, so every rule they register is already listed — though the patch
   // itself waits for `setup`, so the order is only tidiness.
   registerDamageLanding();
+  // The single wrapper behind every rule that changes what a hit marks. Unlike
+  // the one above, this patch goes on immediately — `CONFIG.Actor.documentClass`
+  // is assigned at script load — so it must be in place before anything can be
+  // damaged, which `init` guarantees on its own.
+  registerDamageMarking();
   // The single wrapper behind every card that declares a target it must not ask
   // for. After the features, so every rule they register is already listed —
   // though the patch itself waits for `setup`, so the order is only tidiness.
@@ -212,4 +222,7 @@ Hooks.once("ready", () => {
   // The Slayer card's dice pool is stored on the card, so somebody has to put it
   // there. Only the active GM's client actually writes; see `reconcileSlayerCards`.
   void reconcileSlayerCards();
+  // Same again for Brave Face's once-per-session counter, which has to exist on
+  // the card before the first hit lands for the system's refresh to clear it.
+  void reconcileBraveFaceCards();
 });

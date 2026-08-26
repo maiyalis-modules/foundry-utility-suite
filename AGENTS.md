@@ -1753,25 +1753,17 @@ loads).
   - **The reduction is on the marks, not the damage.** Thresholds mean the two
     are not interchangeable: against a Major of 8, 8 damage marks 2 and 7 marks
     1, so the same subtraction is worth a whole Hit Point at one number and
-    nothing at another. `Actor#takeDamage` is therefore wrapped, and for the
-    length of one call on one actor its `modifyResource` is shadowed by an own
-    property — a one-shot that sees the finished `{ key: "hitPoints", value }`
-    entry (after resistances, thresholds and the armor-slot dialog) and takes one
-    off it before the write. The shadow restores itself first thing, so nothing
-    later in the same call is intercepted, and the outer `finally` restores again
-    (idempotent) if `takeDamage` throws.
-  - **Why not the hooks, and why not healing it back.** `preTakeDamage` and
-    `postCalculateDamage` both fire while the value is still raw damage, before
-    `convertDamageToThreshold`; `postTakeDamage` fires after `modifyResource` has
-    written the sheet. Applying and then healing a point back is not merely
-    cosmetic: marking your last Hit Point is a death move, so a character taken
-    to zero and quietly refilled has already had the system's attention.
-  - **It holds the damage open, on the system's own precedent.** The prompt goes
-    to the witch over `feature-ask.ts`'s socket with its usual timeout, so
-    `takeDamage` waits on another client. `Actor#takeDamage` already does this
-    three lines earlier — `this.owner.query('armorSlot', …, { timeout: 30000 })`
-    — and the wait only ever happens when a live talisman is on the person who
-    was actually hit.
+    nothing at another. So it rides **Damage marking** (below), which hands it
+    the finished `{ key: "hitPoints", value }` entry — after resistances,
+    thresholds and the armor-slot dialog — and it takes one off before the write.
+    Its `wants` is "is this actor carrying a talisman", which is what keeps the
+    seam off everybody else.
+  - **Why not healing it back.** Applying and then healing a point back is not
+    merely cosmetic: marking your last Hit Point is a death move, so a character
+    taken to zero and quietly refilled has already had the system's attention.
+  - **It holds the damage open, on the system's own precedent** — see **Damage
+    marking**. The wait only ever happens when a live talisman is on the person
+    who was actually hit.
   - **The witch is asked, not the person hit.** `responderFor(witch)`, falling
     back to the client running the damage when nobody who owns her is connected.
     Spending the talisman is her decision and the only interesting one in the
@@ -1945,6 +1937,62 @@ loads).
     number"; `modifyResource` caps the receiving end, so overspending spends it
     all. The headroom is shown while choosing and the overspill is said out loud
     afterwards rather than silently swallowed.
+- **Brave Face** (`src/daggerheart/brave-face.ts`) — the Warborne community's
+  (*Void for Daggerheart*) "Once per session, when an attack would cause you to
+  mark a Stress, you can spend a Hope instead."
+  `Compendium.the-void-unofficial.communities.Item.KrqCfjp4E1r10XQr`, shipped as
+  description only — no action, no resource, no effect. World setting
+  `braveFace`, **on** by default, filed under Warborne in the Communities tab.
+  - **There is nothing to press, and that is correct.** The rule has no moment a
+    player could press it *at*: it fires inside somebody else's attack, after the
+    damage is worked out and before the sheet is written. So this is the first
+    feature here with no card takeover of any kind — one rule on
+    `damage-marking.ts` and one on `damage-landing.ts`, and the card is left
+    exactly as the Void ships it.
+  - **The Stress is never marked, rather than marked and cleared**, and that is
+    the whole reason the seam is where it is. `Actor#convertStressDamageToHP`
+    turns an unmarkable Stress into a Hit Point, and it runs *inside*
+    `modifyResource` — after this rule has had its say. So a character whose
+    Stress track is already full is exactly the one Brave Face saves, which is
+    what the rule is for; marking and refunding afterwards would take the Hit
+    Point and hand back the Stress.
+  - **The once-per-session use is the card's own `system.resource`** — `max: 1`,
+    `increasing`, `session` recovery. Slayer's mechanism and all of its
+    reasoning: it puts a counter on the card's row in the Features tab so the use
+    is visible and correctable, and the system's own end-of-session refresh
+    clears it, so no part of the reset is this module's to get wrong. Written
+    *whole* by `reconcileBraveFaceCards` at `ready` from the single `isWriter`
+    client — see `slayer.ts` on why a partial write into a nullish `SchemaField`
+    is the one shape to avoid.
+  - **The use is spent through `modifyResource`'s item-cost path**
+    (`{ key: "resource", itemId, target }`), not by updating the card, because
+    that path relays through a GM via `emitGMUpdate` — and the client running
+    this is whoever applied the damage, which for an ally's area attack is
+    another player who cannot write to Finnegan's sheet.
+  - **Stress the player chose to spend is not Stress an attack caused.**
+    `takeDamage` merges the armor-slot dialog's `stressSpent` into the very same
+    `{ key: "stress" }` entry, so by the seam the two are indistinguishable.
+    Hence the recorded `Attack.stress`, read off `config.damage.resources.stress`
+    on the `damage-landing.ts` `before` rule: the swap can never take more than
+    the attack brought, and a hit whose Stress is entirely the player's own
+    raises no prompt. That recording is also what keeps `wants` from interposing
+    on the overwhelming majority of hits — 42 of the SRD's adversary actions
+    carry a Stress damage part, and nothing else does.
+  - **"An attack" is read as an action's damage landing on you**, deliberately
+    not narrowed to actions that made an attack roll: an environment's damage is
+    an attack to everyone at the table, and narrowing would fail *silently* — the
+    offer simply would not appear. The cost of the wide reading is an offer that
+    can be declined. **"A Stress" is one**; an attack marking two leaves one
+    marked, since taking the lot for a single Hope would be the more generous
+    invention.
+  - **The person hit is the one asked**, which is the only reaction here that
+    goes to them rather than to somebody watching — the Stress is theirs to take
+    and the Hope theirs to spend, so there is no third party with an interest.
+  - **Deliberate silences.** Stress from pressing your own card, typed onto a
+    sheet by the GM, or applied by a macro that never went through `applyDamage`
+    raises nothing. Healing is skipped first. A `fullRestore` entry ("mark all
+    your Stress") is left alone — a different rule with a different arithmetic.
+    The use is neither refunded nor consumed on a decline.
 - **Not Good Enough** (`src/daggerheart/not-good-enough.ts`) — the Blade domain's
   (SRD level 1) "When you roll your damage dice, you can reroll any 1s or 2s."
   Two settings: world `notGoodEnoughReroll`, **on** by default, filed under Blade
@@ -2287,6 +2335,39 @@ loads).
     `applyDamage` itself applies (`targets ?? config.targets.filter(t =>
     t.hitResult?.success)`), so a rule and the system can never disagree about who
     was damaged.
+- **Damage marking** (`src/daggerheart/damage-marking.ts`) — the single
+  interception of the finished mark list, behind every rule that changes what an
+  actor is about to mark. Features register with
+  `onDamageMarking({ id, wants, mark })`. Extracted from `tethered-talisman.ts`
+  when Brave Face became the second consumer — same one-patch-many-rules
+  reasoning as **Card targeting** and **Damage landing**, and sharper here: two
+  wrappers would each shadow the other's shadow of the same instance method.
+  - **The moment** is the argument `Actor#takeDamage` hands to
+    `modifyResource` — after resistances, after `convertDamageToThreshold`, after
+    the armor-slot dialog, and *before* `convertStressDamageToHP`. Entries are
+    plain `{ key, value }`, and a reversed resource (Hit Points, Stress, Armor)
+    arrives positive because marking raises it. The method's own hooks are all in
+    the wrong place: `preTakeDamage` and `postCalculateDamage` fire while the
+    value is still raw damage, `postTakeDamage` after the sheet is written.
+  - **The shadow is an own property on the instance and one-shot.** It lasts one
+    call on one actor, restores itself as its first act — so a rule that goes on
+    to call `actor.modifyResource` to charge a cost reaches the real method — and
+    the outer `finally` restores again, idempotently, if `takeDamage` throws.
+  - **`wants(actor)` runs before the damage is calculated**, so it cannot know
+    what will be marked; `mark` still has to check. What it buys is that the
+    shadow is never installed for an actor no rule cares about, which is nearly
+    every actor on every hit.
+  - Rules run in registration order on the same array, so a later one sees what
+    an earlier one did — the correct reading when two features both reduce a hit.
+    One that throws is logged and skipped, because the damage lands either way.
+  - **`mark` is awaited and the rules on it ask over a socket**, which holds the
+    damage open on somebody else's answer. That is the system's own precedent,
+    three lines earlier in the same method: `this.owner.query('armorSlot', …,
+    { timeout: 30000 })` stops the same damage dead while the damaged player
+    chooses whether to spend armor.
+  - Patched during **`init`**, not `setup`, unlike the other two shared wrappers:
+    `CONFIG.Actor.documentClass` is assigned at script load, and the patch has to
+    be in place before anything can be damaged. Same reasoning as `reach.ts`.
 - **GM action-effect relay** (`src/daggerheart/gm-action-effects.ts`) — fills the
   Daggerheart system's permission gap when a player's action applies an embedded
   ActiveEffect to an adversary. Its `EffectsField.applyEffect` calls core's
@@ -2538,7 +2619,8 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     The Daggerheart Automation window has a "General" tab plus one tab per kind of
     character content — Ancestries, Communities, Classes, Domains — and a rule is
     filed under the card that prints it (Fearless under Infernis, Adaptability
-    under Human, Close-Knit under Hearthborne; Blood Maledict,
+    under Human, Close-Knit under Hearthborne, Brave Face under Warborne; Blood
+    Maledict,
     Crimson Rite and Hybrid Form under Blood Hunter; Hold Them Off, Ranger's
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted

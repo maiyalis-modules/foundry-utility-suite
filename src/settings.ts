@@ -25,6 +25,7 @@ import { SessionLogConfig } from "./apps/session-log-config.js";
 import { MENUS, MODULE_ID, SETTINGS } from "./constants.js";
 import { reconcileOpportunityCards } from "./daggerheart/attack-of-opportunity.js";
 import { reconcileBlightingStrikeCards } from "./daggerheart/blighting-strike.js";
+import { reconcileBraveFaceCards } from "./daggerheart/brave-face.js";
 import { reconcileCloseKnitCards } from "./daggerheart/close-knit.js";
 import { reconcileCompanionCards } from "./daggerheart/companion.js";
 import { DECK_CARD_TYPES, DEFAULT_DECK_LIMIT } from "./daggerheart/deck-limit.js";
@@ -472,6 +473,20 @@ export function registerSettings(): void {
     // Same reason as Reach and Companion: the button is added as documents are
     // prepared, and nothing re-prepares an open sheet on its own.
     onChange: () => reconcileCloseKnitCards(),
+  });
+
+  // World-scoped for the same reason as Tethered Talisman, whose seam it shares:
+  // it changes what a hit writes, on whichever client is applying the damage.
+  game.settings.register(MODULE_ID, SETTINGS.braveFace, {
+    name: "EE.Settings.BraveFace.Name",
+    hint: "EE.Settings.BraveFace.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+    // The card carries a counter that has to exist before the first hit lands.
+    // Only the active GM's client writes; see `reconcileBraveFaceCards`.
+    onChange: () => reconcileBraveFaceCards(),
   });
 
   // Same mechanism and so the same scope as Close-Knit: the button is built

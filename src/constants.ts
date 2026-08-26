@@ -358,6 +358,21 @@ export const SETTINGS = {
    */
   closeKnitShareHope: "closeKnitShareHope",
   /**
+   * Master switch for **Brave Face** (Warborne, *Void for Daggerheart*): when an
+   * attack is about to make a character mark a Stress, ask whether to spend a
+   * Hope instead — once per session, tracked on the card's own counter. See
+   * `daggerheart/brave-face.ts`.
+   *
+   * World-scoped and **on** by default, for the same reason as
+   * {@link SETTINGS.tetheredTalisman}, whose seam this one shares: the rule
+   * changes what a hit writes, on whichever client is applying it, so a per-user
+   * answer would mean the same attack costing a Stress or a Hope depending on who
+   * pressed Apply. Switching it off returns the card to being description-only
+   * and leaves the counter on it alone — a use already spent stays spent, and the
+   * system's end-of-session refresh still clears it.
+   */
+  braveFace: "braveFace",
+  /**
    * Master switch for automating **Attack of Opportunity** (Warrior class
    * feature): put a button on a card the SRD ships as prose, so the player can
    * make the reaction roll — trait of their choice, scored against the target's

@@ -192,7 +192,23 @@ const COMMUNITIES: Catalog = {
       ],
     },
     fromVoid("Reborne"),
-    fromVoid("Warborne"),
+    {
+      id: "warborne",
+      label: "Warborne",
+      fromVoid: true,
+      groups: [
+        {
+          legend: "EE.Automation.FeaturesLegend",
+          settings: [
+            {
+              key: SETTINGS.braveFace,
+              name: "EE.Settings.BraveFace.Name",
+              hint: "EE.Settings.BraveFace.Hint",
+            },
+          ],
+        },
+      ],
+    },
   ],
 };
 
