@@ -44,6 +44,7 @@ import { registerNotThisTime } from "./daggerheart/not-this-time.js";
 import { registerRangersFocus } from "./daggerheart/rangers-focus.js";
 import { registerReach } from "./daggerheart/reach.js";
 import { reconcileSlayerCards, registerSlayer } from "./daggerheart/slayer.js";
+import { registerSlumber } from "./daggerheart/slumber.js";
 import { registerStrangePatterns } from "./daggerheart/strange-patterns.js";
 import { installRollPipeline } from "./daggerheart/roll-pipeline.js";
 import { registerViciousEntangle } from "./daggerheart/vicious-entangle.js";
@@ -198,6 +199,10 @@ Hooks.once("init", async () => {
   // Hope/Fear result off the damage config, which is long after every window
   // that could rewrite one, so its place in this list costs nothing.
   registerFaceYourFear();
+  // Not a roll window either, and not even an action: it guards the *removal* of a
+  // condition one card applies, on `preDeleteActiveEffect`. Nothing about a roll
+  // reaches it, so its place in this list costs nothing.
+  registerSlumber();
   // Not a roll window either, and not a card that can be pressed at all: a
   // passive rule that raises a consumable's healing formula before it is rolled.
   // It patches one of the system's action fields directly, and waits for `setup`

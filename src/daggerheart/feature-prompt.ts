@@ -19,8 +19,8 @@
  * Dismissing the dialog (Escape, the close button, the timeout) means "none",
  * never "all": every caller *holding up a roll* is mid-pipeline holding something
  * back, so the safe answer is always to let the unmodified outcome through.
- * {@link chooseOne} is the exception in a second way — see its own note on why it
- * has no timer at all.
+ * {@link chooseOne} is the exception in a second way — it runs no timer unless
+ * asked to; see its own note on why the default is the other way round there.
  *
  * ## Why it takes plain data
  *
@@ -323,7 +323,7 @@ function installTimerBar(root: HTMLElement, remainingMs: number): () => void {
  */
 async function waitWithTimeout(
   config: AnyObject,
-  onRender?: (root: HTMLElement) => void,
+  onRender?: (root: HTMLElement, instance: AnyObject) => void,
   untimed = false,
 ): Promise<unknown> {
   let dialog: AnyObject | null = null;
@@ -381,7 +381,7 @@ async function waitWithTimeout(
       // here, on the same callback, rather than through a second one the caller
       // would have to remember not to pass — `render` is spread away above.
       try {
-        if (root && onRender) onRender(root);
+        if (root && onRender) onRender(root, instance);
       } catch (error) {
         // The dialog is already on screen and answerable; losing a nicety in it
         // must not cost the player the question.
@@ -797,48 +797,86 @@ export interface OneOfRequest {
   title: string;
   /** The question as a sentence. */
   intro: string;
+  /**
+   * The rule being applied, quoted under the question.
+   *
+   * Somebody else's authored prose — a card's printed text, an effect's own
+   * description — for the same reason {@link NoticeRequest.body} is a separate
+   * field: it is escaped and set apart in a quoted block, so it cannot be
+   * mistaken for the module's sentence introducing it. It earns its place on a
+   * prompt whose buttons *are* the rule's clauses, where the reader needs the
+   * clause in front of them to tell which button they want.
+   */
+  body?: string;
   /** One button each, in the order they should read. */
   options: PromptOption[];
+  /**
+   * Run the countdown, and let it expire the question.
+   *
+   * **Off by default**, which is the opposite of every other prompt here — see
+   * {@link chooseOne}'s note on why. Turned on by a caller that has *interrupted*
+   * something rather than followed it: an unanswered dialog there leaves the
+   * table looking at an action that neither happened nor visibly failed, which is
+   * the same stall the timeout exists to prevent everywhere else.
+   *
+   * Expiry returns `null`, exactly like dismissal, so a caller never has to tell
+   * the two apart — and the answer it maps `null` to should always be the one
+   * that changes nothing.
+   */
+  timed?: boolean;
 }
 
 /**
  * Ask which *one* of `request.options` to use. Returns the id, or null for a
  * dialog that was dismissed.
  *
- * ## Why this one has no timeout
+ * ## Why this one has no timeout by default
  *
- * Unlike every other prompt in this file, nothing is being held back while it is
- * open. The others are raised from inside `DHRoll.buildPost`, where the chat card
- * and the resource updates for the whole table are waiting on the answer, so an
- * unattended client cannot be allowed to stall play. This one is raised *after*
- * an action has resolved — the cost is paid, the card has posted — so the only
- * thing an unanswered dialog costs is that player's own follow-through, and
- * timing them out at 30 seconds would take a choice away for no one's benefit.
+ * Unlike every other prompt in this file, nothing is normally being held back
+ * while it is open. The others are raised from inside `DHRoll.buildPost`, where
+ * the chat card and the resource updates for the whole table are waiting on the
+ * answer, so an unattended client cannot be allowed to stall play. This one is
+ * usually raised *after* an action has resolved — the cost is paid, the card has
+ * posted — so the only thing an unanswered dialog costs is that player's own
+ * follow-through, and timing them out at 30 seconds would take a choice away for
+ * no one's benefit.
+ *
+ * {@link OneOfRequest.timed} turns the clock back on for the caller that is the
+ * exception: one that raised the question by *cancelling* something, and so does
+ * have a table waiting on it.
  */
 export async function chooseOne(request: OneOfRequest): Promise<string | null> {
-  const { title, intro, options } = request;
+  const { title, intro, body, options, timed } = request;
   if (options.length === 0) return null;
-
-  const { DialogV2 } = foundry.applications.api;
 
   // Rows whenever an option carries anything to show; plain buttons otherwise.
   if (options.some((option) => option.img || option.tag || option.stat)) {
     return chooseRow(request);
   }
 
-  const answer = await DialogV2.wait({
-    classes: ["ee-feature-prompt"],
-    window: { title },
-    content: `<p>${escapeHtml(intro)}</p>`,
-    buttons: options.map((option, index) => ({
-      action: option.id,
-      label: option.label,
-      default: index === 0,
-    })),
-    rejectClose: false,
-  }).catch(() => null);
+  const answer = await waitWithTimeout(
+    {
+      classes: ["ee-feature-prompt"],
+      window: { title },
+      content: `<p>${escapeHtml(intro)}</p>${renderQuote(body)}`,
+      buttons: options.map((option, index) => ({
+        action: option.id,
+        label: option.label,
+        default: index === 0,
+      })),
+    },
+    undefined,
+    timed !== true,
+  );
 
   return options.some((option) => option.id === answer) ? String(answer) : null;
+}
+
+/** Somebody else's prose, escaped and set apart. Empty string for nothing. */
+function renderQuote(body: string | undefined): string {
+  return typeof body === "string" && body.length > 0
+    ? `<p class="ee-feature-notice">${escapeHtml(body)}</p>`
+    : "";
 }
 
 /** One row: artwork, name over its tag, and the figure on the right. */
@@ -882,46 +920,45 @@ function renderRow(option: PromptOption): string {
  * player needs somewhere obvious to say no.
  */
 async function chooseRow(request: OneOfRequest): Promise<string | null> {
-  const { title, intro, options } = request;
-  const { DialogV2 } = foundry.applications.api;
+  const { title, intro, body, options, timed } = request;
 
   let picked: string | null = null;
 
-  await DialogV2.wait({
-    classes: ["ee-feature-prompt"],
-    window: { title },
-    content: `<p>${escapeHtml(intro)}</p><div class="ee-feature-rows">${options
-      .map(renderRow)
-      .join("")}</div>`,
-    buttons: [{ action: "cancel", label: game.i18n.localize("EE.Features.PromptCancel") }],
-    rejectClose: false,
-    render: (_event: Event, instance: AnyObject) => {
-      try {
-        const root = instance?.["element"] as HTMLElement | undefined;
-        if (!root) return;
-
-        // One delegated listener on the dialog rather than one per row, reading
-        // a `data-*` attribute through `closest()` — the house pattern. Core
-        // happens to set `button > * { pointer-events: none }`, so the target is
-        // already the row, but `closest()` costs nothing and doesn't depend on
-        // that staying true.
-        root.addEventListener("click", (event: Event) => {
-          const row = (event.target as HTMLElement | null)?.closest?.("[data-ee-choice]");
-          if (!row) return;
-
-          const id = row.getAttribute("data-ee-choice");
-          // Re-checked against the list this function rendered a moment ago
-          // rather than trusted from the DOM.
-          if (!options.some((option) => option.id === id)) return;
-
-          picked = id;
-          void instance["close"]?.();
-        });
-      } catch (error) {
-        console.warn(`${LOG_PREFIX} Feature prompt: could not wire up the choices.`, error);
-      }
+  // Routed through `waitWithTimeout` rather than calling `DialogV2.wait` itself,
+  // so `timed` means the same thing in both forms of this prompt. Its result is
+  // discarded either way — a row click closes the window, which resolves the
+  // dialog with its dismissal value, so the recorded choice is the answer. That
+  // also makes the timeout free: it closes the window without recording one.
+  await waitWithTimeout(
+    {
+      classes: ["ee-feature-prompt"],
+      window: { title },
+      content: `<p>${escapeHtml(intro)}</p>${renderQuote(body)}<div class="ee-feature-rows">${options
+        .map(renderRow)
+        .join("")}</div>`,
+      buttons: [{ action: "cancel", label: game.i18n.localize("EE.Features.PromptCancel") }],
     },
-  }).catch(() => null);
+    (root: HTMLElement, instance: AnyObject) => {
+      // One delegated listener on the dialog rather than one per row, reading
+      // a `data-*` attribute through `closest()` — the house pattern. Core
+      // happens to set `button > * { pointer-events: none }`, so the target is
+      // already the row, but `closest()` costs nothing and doesn't depend on
+      // that staying true.
+      root.addEventListener("click", (event: Event) => {
+        const row = (event.target as HTMLElement | null)?.closest?.("[data-ee-choice]");
+        if (!row) return;
+
+        const id = row.getAttribute("data-ee-choice");
+        // Re-checked against the list this function rendered a moment ago
+        // rather than trusted from the DOM.
+        if (!options.some((option) => option.id === id)) return;
+
+        picked = id;
+        void instance["close"]?.();
+      });
+    },
+    timed !== true,
+  );
 
   return picked;
 }
@@ -1218,15 +1255,10 @@ export async function showNotice(request: NoticeRequest): Promise<void> {
 
   const { DialogV2 } = foundry.applications.api;
 
-  const quoted =
-    typeof body === "string" && body.length > 0
-      ? `<p class="ee-feature-notice">${escapeHtml(body)}</p>`
-      : "";
-
   await DialogV2.wait({
     classes: ["ee-feature-prompt"],
     window: { title },
-    content: `<p>${escapeHtml(intro)}</p>${quoted}`,
+    content: `<p>${escapeHtml(intro)}</p>${renderQuote(body)}`,
     buttons: [{ action: "dismiss", label: dismissLabel, default: true }],
     rejectClose: false,
   }).catch(() => null);

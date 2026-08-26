@@ -407,6 +407,20 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // World-scoped, and here that is load-bearing rather than conventional: the
+  // guard cancels a deletion and spends the GM's Fear, so a per-user version
+  // would make the same right-click do two different things depending on which
+  // GM pressed it. Read at the moment of the delete, so a change takes effect on
+  // the very next one.
+  game.settings.register(MODULE_ID, SETTINGS.slumberFearGuard, {
+    name: "EE.Settings.SlumberFearGuard.Name",
+    hint: "EE.Settings.SlumberFearGuard.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   // World-scoped for a reason beyond consistency here too: the actions this adds
   // are built during data preparation on every client that prepares the card, and
   // the range origin they declare is read on whichever client rolled. A per-user

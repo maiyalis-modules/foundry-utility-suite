@@ -1462,6 +1462,68 @@ loads).
   - **Not a preparation patch.** Nothing is written into prepared data, so the
     setting needs no `onChange` reconciliation — unlike Blighting Strike, whose
     reshape has to be undone.
+- **Slumber** (`src/daggerheart/slumber.ts`) — the first of the three abilities on
+  the Codex domain's *Book of Illiat* (SRD p.124),
+  `Compendium.daggerheart.domains.Item.df4iRqQzRntrF6Qw`: "Make a Spellcast Roll
+  against a target within Very Close range. On a success, they're *Asleep* until
+  they take damage or the GM spends a **Fear** on their turn to clear this
+  condition." World setting `slumberFearGuard`, **on** by default, filed under
+  **Domains → Codex** (the entry was a bare `plain("Codex")` before this).
+  - **The card's front half is already correct and is not touched.** The Slumber
+    action is an `attack` with a Spellcast roll, Very Close range, no damage and
+    an embedded *Slumber* ActiveEffect that `EffectsField.applyEffects` copies
+    onto every target with `hitResult.success`. What no card can ship is the
+    sentence saying when the condition *ends*.
+  - **The condition never expires on its own.** `system.duration.type` is
+    `temporary`, and `expireActiveEffects` filters `temporary` and `custom` out
+    before it deletes anything — so it sits on the target until a human removes
+    it, which makes the removal the only moment the rule can be applied.
+  - **So the guard is a veto, not a confirmation.** `preDeleteActiveEffect` is
+    synchronous, so there is no asking first and deleting second in one pass. The
+    delete is cancelled with `return false`, a prompt is raised detached, and an
+    answer that removes the effect **re-issues** the deletion with
+    `eeSlumberApproved: true` in the operation — which the same hook checks first
+    and waves through. Confirmed against `ClientDatabaseBackend`: the veto is
+    per-document (the id is filtered out of `operation.ids`, the rest of a batch
+    survives), and unknown operation keys reach the hook because `options` is
+    the operation minus `{ids, deleteAll, noHook, pack, parent}`.
+  - **Three answers, because there are three things the GM might mean**: *Spend a
+    Fear* (the printed price), *Remove anyway* (the other printed clause — they
+    took damage — and every ordinary reason an effect gets deleted), and *Leave it
+    in place* (the mis-click on the delete). Dismissal and the countdown both mean
+    the last one, the module's standing rule that the answer a prompt gives for
+    you is the one that changes nothing.
+  - **GM clients only.** `preDelete` fires on the client that *initiated* the
+    deletion, and Fear is a world-scoped setting only a GM can write. A player's
+    delete is left alone rather than shown a price they cannot pay — which costs
+    nothing in practice, since Slumber is cast at the GM's adversaries.
+  - **Recognising the effect**, in order: it must be parented to an **Actor** (the
+    template on the caster's card is parented to an Item, and editing the card
+    must not raise a prompt); then the `featureId` flag; then the origin, which
+    `EffectsField.applyEffect` sets to the source effect's uuid and therefore ends
+    in `.ActiveEffect.gfZTHSgwYSDKsePW` — the compendium id, which survives every
+    import. The applied copy's own `_id` is **not** usable: `create` without
+    `keepId` mints a new one. Name is the last resort, and is what makes a
+    hand-dragged copy work.
+  - `feature-prompt.ts` grew two things on **`chooseOne`**, and both branches of it
+    (plain buttons and rows) now go through `waitWithTimeout` so they mean the
+    same thing: **`timed`**, which turns the countdown back *on* — the opposite
+    default from every other prompt there, because `chooseOne` normally follows a
+    resolved action while this caller has *cancelled* one and cannot leave the GM
+    staring at a delete that neither happened nor refused; and **`body`**, the
+    quoted-prose block borrowed from `showNotice` (same `.ee-feature-notice`
+    class, now one shared `renderQuote`), which carries the effect's own
+    description — the buttons *are* that sentence's clauses, so the reader needs
+    it in front of them. `waitWithTimeout`'s `onRender` now also receives the
+    dialog instance, which is what lets the row branch close itself properly.
+  - **Fear is spent before the delete and refunded if the delete throws**, and
+    both the pool and the effect are re-checked after the prompt — it sat on
+    screen for up to 30 seconds.
+  - Deliberately **not** automated: **"until they take damage"**, which is real
+    work of its own (what counts as damage for a target that marked no HP because
+    of Armor?) and would delete a condition the table still considers live if
+    guessed at — *Remove anyway* is what covers it meanwhile; and **"on their
+    turn"**, which Daggerheart gives nothing to check against.
 - **Commune** (`src/daggerheart/commune.ts`) — the Void's Witch class feature,
   `Compendium.the-void-unofficial.classes.Item.PKcnVdqacraEf8uL`. World setting
   `communeOracle`, **on** by default, filed under Witch in the Classes tab (the
@@ -2485,6 +2547,19 @@ loads).
     Fear result another feature converts to Hope does not offer the die, because
     `offersFor` builds the whole prompt before any of it applies; and which dice were
     spent on what, since the card tracks a count rather than identities.
+- **Fear** (`src/daggerheart/fear.ts`) — the GM's Fear counter: `currentFear()`,
+  `setFear()` and `spendFear(price, label)`. Fear is the one resource in
+  Daggerheart that belongs to nobody's sheet — Hope and Stress are actor fields
+  and go through `Actor#modifyResource`, Fear is a **world-scoped game setting**
+  the system owns — which is the whole reason this is a file. Extracted from
+  `hex.ts` ("spends a number of Fear equal to your Spellcast trait") when
+  `slumber.ts` arrived ("spends a Fear on their turn"). The setting *name* is read
+  from `CONFIG.DH.SETTINGS.gameSettings.Resources.Fear` with `"ResourcesFear"` as
+  the fallback: a wrong key would silently read zero forever, which looks exactly
+  like a table that has spent it all. `spendFear` **re-reads the pool immediately
+  before the write** (every caller asked a human first) and returns `false` rather
+  than throwing, including for a non-GM — only a GM can write a world setting, and
+  every card that spends Fear spends it on the GM's decision.
 - **Card targeting** (`src/daggerheart/card-targeting.ts`) — the single wrapper
   around `DHBaseAction#use` behind every card that declares a target it must not
   ask for. Features register a predicate with `untargetAction(rule)`; the patch
@@ -2854,7 +2929,8 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Crimson Rite and Hybrid Form under Blood Hunter; Hold Them Off, Ranger's
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
-    Tracker under Sage, Not Good Enough under Blade, Not This Time and Strange
+    Tracker and Vicious Entangle under Sage, Slumber under Codex, Not Good Enough
+    under Blade, Not This Time and Strange
     Patterns under Wizard, Face Your Fear under Wizard,
     Attack of Opportunity and
     Slayer under Warrior, Commune, Witch's Charm, Hex, Herbal Remedies and

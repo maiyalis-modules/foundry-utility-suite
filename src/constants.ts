@@ -305,6 +305,21 @@ export const SETTINGS = {
    */
   viciousEntangleRestrain: "viciousEntangleRestrain",
   /**
+   * Master switch for the ending of **Slumber** (Codex domain, the *Book of
+   * Illiat*): deleting the *Slumber* condition from a target asks the GM which
+   * of the rule's two endings this is — spend the Fear the rule names, or remove
+   * it without paying because the target took damage — with a third answer that
+   * puts the effect back. See `daggerheart/slumber.ts`.
+   *
+   * World-scoped and **on** by default. The scope is not a formality here: the
+   * guard cancels a database deletion and spends a world resource, and both are
+   * table-wide facts rather than one GM's preference. Switching it off leaves the
+   * card exactly as the SRD ships it — the roll, the range and the condition
+   * landing are the system's own and are untouched either way — and deletions go
+   * through unasked, which is what they do today.
+   */
+  slumberFearGuard: "slumberFearGuard",
+  /**
    * Master switch for the Beastbound **Companion** card: it grows two buttons —
    * the companion's attack, and a plain action roll — and both are made as the
    * ranger's own Spellcast Roll, with the companion's Experiences on offer for a

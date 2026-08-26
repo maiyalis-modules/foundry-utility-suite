@@ -459,7 +459,22 @@ const DOMAINS: Catalog = {
         },
       ],
     },
-    plain("Codex"),
+    {
+      id: "codex",
+      label: "Codex",
+      groups: [
+        {
+          legend: "EE.Automation.DomainCardsLegend",
+          settings: [
+            {
+              key: SETTINGS.slumberFearGuard,
+              name: "EE.Settings.SlumberFearGuard.Name",
+              hint: "EE.Settings.SlumberFearGuard.Hint",
+            },
+          ],
+        },
+      ],
+    },
     plain("Grace"),
     plain("Midnight"),
     {

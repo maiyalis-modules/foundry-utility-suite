@@ -107,7 +107,8 @@
  *   live off the witch when it is pressed rather than stored when the hex was
  *   cast, because the rule names the trait, not the number it happened to have
  *   that evening. Refused, with the shortfall named, when there is not enough
- *   Fear.
+ *   Fear. Reaching the counter is `fear.ts`'s job, which is where that code went
+ *   when Slumber became the second card to spend from it.
  * - **"Otherwise, remove it when the scene ends"** is deliberately **not**
  *   automated. A Daggerheart scene is a fiction boundary, not a canvas one and
  *   not a combat: hanging the removal on `canvasReady` or on the end of an
@@ -148,6 +149,7 @@
 import { FLAGS, LOG_PREFIX, MODULE_ID, SETTINGS } from "../constants.js";
 import { damagedTargets, onDamageLanding } from "./damage-landing.js";
 import { onDamageModifiers } from "./damage-modifiers.js";
+import { currentFear, spendFear } from "./fear.js";
 import { askUser, responderFor } from "./feature-ask.js";
 import type { PromptHeadline, PromptRequest } from "./feature-prompt.js";
 import {
@@ -183,10 +185,6 @@ const HIT_POINTS = "hitPoints";
 
 /** The system's own name for a roll made in response to something else. */
 const REACTION = "reaction";
-
-/** The system id, and the world setting its Fear counter lives in. */
-const DH_ID = "daggerheart";
-const FEAR_KEY = "ResourcesFear";
 
 /** The key this feature's damage modifier occupies in `config.modifiers`. */
 const MODIFIER_KEY = "eeHex";
@@ -704,28 +702,6 @@ async function considerHex(hurt: AnyObject, updates: unknown): Promise<void> {
  * Lifting it
  * ------------------------------------------------------------------ */
 
-/** The name of the system setting holding the GM's Fear. */
-function fearSetting(): string {
-  return String(CONFIG["DH"]?.SETTINGS?.gameSettings?.Resources?.Fear ?? FEAR_KEY);
-}
-
-/** The GM's Fear counter, as the system stores it. */
-function currentFear(): number {
-  return Number(game.settings.get(DH_ID, fearSetting()) ?? 0);
-}
-
-/**
- * Set it.
- *
- * Written straight to the setting rather than through `Actor#modifyResource`:
- * that route wants an actor it has no use for here, and this only ever runs on a
- * GM's client, which is the only client allowed to write a world-scoped setting
- * at all. The system's own `onChange` re-renders its Fear display.
- */
-async function setFear(value: number): Promise<void> {
-  await game.settings.set(DH_ID, fearSetting(), Math.max(0, value));
-}
-
 /**
  * What lifting this witch's hex costs.
  *
@@ -772,13 +748,21 @@ async function lift(record: AnyObject): Promise<void> {
     return;
   }
 
+  // The counter is re-read inside `spendFear`, so this check is only about
+  // saying *why* nothing happened before anything does.
   const fear = currentFear();
   if (fear < price) {
     ui.notifications?.warn(game.i18n.format("EE.Features.Hex.LiftNoFear", { price, fear }));
     return;
   }
 
-  await setFear(fear - price);
+  if (!(await spendFear(price, LABEL))) {
+    ui.notifications?.warn(
+      game.i18n.format("EE.Features.Hex.LiftNoFear", { price, fear: currentFear() }),
+    );
+    return;
+  }
+
   await unmarkActor(request(String(creature["uuid"] ?? ""), witch));
 
   await ChatMessage.create({
