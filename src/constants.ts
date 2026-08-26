@@ -234,6 +234,22 @@ export const SETTINGS = {
    */
   strangePatternsNumber: "strangePatternsNumber",
   /**
+   * Master switch for automating **Face Your Fear** (School of War, the Wizard's
+   * subclass — SRD p.25): when a character succeeds with Fear on an attack roll,
+   * add the extra magic damage the card promises to the damage that follows.
+   * Covers all three tiers of the same sentence — Face Your Fear's 1d10, Fueled
+   * by Fear's 2d10 and Have No Fear's 3d10 — by whichever card the character has
+   * actually earned, not by how many are sitting on the sheet. See
+   * `daggerheart/face-your-fear.ts`.
+   *
+   * World-scoped like the rest: this one decides what a damage roll totals, and
+   * a per-client answer would have the GM and the player reading different
+   * numbers off the same hit. **On** by default.
+   *
+   * Off leaves all three cards as printed text the table applies by hand.
+   */
+  faceYourFearDamage: "faceYourFearDamage",
+  /**
    * Master switch for automating **Hold Them Off** (Ranger): after a successful
    * weapon attack, offer to spend 3 Hope and add up to two more adversaries
    * within the attack's range to the roll that already happened — before the

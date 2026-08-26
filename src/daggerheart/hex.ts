@@ -71,7 +71,9 @@
  *   and an unhexed one the system rolls damage once for both, and the player can
  *   untick it. Wrapping is necessary rather than preferred: the builder ends with
  *   `config.modifiers = mods`, replacing the object wholesale, so anything added
- *   from `preRoll` would be thrown away a few lines later.
+ *   from `preRoll` would be thrown away a few lines later. The wrapper itself is
+ *   `damage-modifiers.ts`'s, alongside Slayer Dice and Face Your Fear; this file
+ *   only registers the rule.
  *
  * `config.roll` tells the two rolls apart. `RollField.prepareConfig` builds it
  * with a formula and no total; `buildEvaluate` replaces it with the finished
@@ -145,6 +147,7 @@
  */
 import { FLAGS, LOG_PREFIX, MODULE_ID, SETTINGS } from "../constants.js";
 import { damagedTargets, onDamageLanding } from "./damage-landing.js";
+import { onDamageModifiers } from "./damage-modifiers.js";
 import { askUser, responderFor } from "./feature-ask.js";
 import type { PromptHeadline, PromptRequest } from "./feature-prompt.js";
 import {
@@ -856,51 +859,21 @@ function decorate(message: AnyObject, html: HTMLElement): void {
 }
 
 /* ------------------------------------------------------------------ *
- * The patch
- * ------------------------------------------------------------------ */
-
-/**
- * Wrap `DamageRoll.temporaryModifierBuilder`.
- *
- * Wrapping rather than hooking, because the builder finishes with
- * `config.modifiers = mods` — it replaces the object, so anything a `preRoll`
- * listener put there would be discarded a few lines later. Patched during `init`:
- * `CONFIG.Dice.daggerheart` is assigned at the system's script load, before any
- * `init` hook, and nothing can be rolled before the canvas exists.
- */
-function patchDamageModifiers(): void {
-  const DamageRoll = CONFIG["Dice"]?.daggerheart?.DamageRoll as AnyObject | undefined;
-  const original = DamageRoll?.["temporaryModifierBuilder"];
-
-  if (typeof original !== "function") {
-    console.warn(`${LOG_PREFIX} ${LABEL}: no damage modifiers to wrap — the bonus is roll-only.`);
-    return;
-  }
-
-  DamageRoll!["temporaryModifierBuilder"] = function (
-    this: AnyObject,
-    config: AnyObject,
-  ): AnyObject {
-    const modifiers = original.call(this, config) as AnyObject;
-
-    try {
-      if (enabled()) addDamageModifier(config, modifiers);
-    } catch (error) {
-      // The damage rolls either way; a broken bonus must not eat the swing.
-      console.warn(`${LOG_PREFIX} ${LABEL}: could not add the damage bonus.`, error);
-    }
-
-    return modifiers;
-  };
-}
-
-/* ------------------------------------------------------------------ *
  * Wiring
  * ------------------------------------------------------------------ */
 
 /** Wire the feature up. Called once during `init`. */
 export function registerHex(): void {
-  patchDamageModifiers();
+  // The damage bonus rides `config.modifiers` — the list the damage dialog
+  // renders and `constructFormula` applies. The wrapper around the builder that
+  // fills it is `damage-modifiers.ts`'s; see there for why it is a wrapper and
+  // not a hook.
+  onDamageModifiers({
+    id: FEATURE_ID,
+    add: (config, modifiers) => {
+      if (enabled()) addDamageModifier(config, modifiers);
+    },
+  });
 
   // The first half of the trigger: who is about to hurt whom. Registered here so
   // the feature stays one file; the wrapper itself is `damage-landing.ts`'s.

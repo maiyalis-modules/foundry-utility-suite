@@ -2219,6 +2219,64 @@ loads).
   - **The GM is exempt from the lock outright.** Somebody has to be able to fix a
     number typed wrong three sessions ago, and a confirmation dialog on every GM
     edit would put a question in front of the one person who cannot be cheating.
+- **Face Your Fear** (`src/daggerheart/face-your-fear.ts`) — the School of War
+  subclass's (Wizard, SRD p.25) "When you succeed with Fear on an attack roll,
+  you deal an extra 1d10 magic damage", and the two cards that raise the same
+  number: **Fueled by Fear** (specialization, p.25, 2d10) and **Have No Fear**
+  (mastery, p.26, 3d10). `Compendium.daggerheart.subclasses.Item.D3ffFWSXCza4WGcM`,
+  `…hNqLf3zEfKRzSbvq` and `…8TH6h6a36h09mf6d` — all three `feature` Items with
+  `actions: {}`, `effects: []` and `resource: null`, so nothing in the system
+  reads any of them. One world setting `faceYourFearDamage` covers all three,
+  **on** by default, filed under **Classes → Wizard** in its own **School of War**
+  group.
+  - **The dice go in through `config.modifiers`**, via `damage-modifiers.ts` — the
+    mechanism behind Bardic Rally and the weapon features. The deciding reason is
+    the **label**: the Daggerheart damage card renders its own tooltip, a row of
+    dice and a total with no formula anywhere on it, so a d10 appended to the
+    formula would be unattributable and the module would be adding damage without
+    ever saying so. A modifier entry names the feature in the damage dialog beside
+    the weapon's own features, and — like Massive and Powerful — can be unticked
+    for a single roll.
+  - **The extra die is *not* typed `magical`**, and this is the one place the
+    automation is knowingly imprecise. Bonus dice cannot be their own damage part
+    (see **Crimson Rite** for why: `convertDamageToThreshold` works on the total),
+    so the die joins the attack's formula and inherits its types. Crimson Rite
+    adds `magical` because that rule *enchants the weapon*; this one does not,
+    because `getResistanceStatus` requires resistance to **all** of a part's types
+    — so adding it would quietly stop a physically-resistant creature halving the
+    *base* weapon damage, on Fear successes only. A weapon that behaves
+    differently against the same troll depending on which Duality die came up
+    higher is the worse lie.
+  - **The Fear success is read at the damage roll, not the attack.**
+    `DamageField.execute` spreads the workflow config into the damage config, so
+    `roll.result.duality` and `roll.success` are both already there — the same two
+    fields the system's own `resultBased` damage reads. Nothing has to be
+    remembered between the rolls, and it is what makes the rider compose with the
+    features that *rewrite* a result: **Fearless** converting Fear to Hope
+    correctly costs the dice, **Witch's Charm** converting a failure into a
+    success with Fear correctly grants them. A critical leaves `duality` at `0`
+    and is excluded on its own.
+  - **Tier by availability, not by possession.** The system grants every one of a
+    subclass's features as an Item when the subclass is taken and gates them
+    afterwards on `subclass.system.featureState` (1/2/3), which is what hides the
+    unearned ones from the sheet — Finnegan is level 1 and holds all three cards.
+    Counting Items would hand a first-level wizard 3d10. Asked through
+    `actor.system.isItemAvailable`, the system's own answer (what `sheetLists`
+    filters on, and what decides whether a feature's effects transfer); without
+    that method the fallback is the printed baseline, the foundation card alone.
+  - **`success` is compared against `true`, never tested for truthiness.**
+    `D20Roll.buildEvaluate` leaves it *undefined* on an attack with nothing
+    targeted and no difficulty, and a rider that fired on an unmeasured attack
+    would inflate a number the GM is about to adjudicate by hand.
+  - **Damage rolled from the chat card's own button adds nothing**, and the same
+    is true of the system's `resultBased` damage. `DhpChatMessage#onRollDamage`
+    rebuilds the config from the message, whose `roll` is a prototype getter
+    returning the `DualityRoll` itself rather than a schema field — so the spread
+    into the damage config drops it, and the stored targets carry no hit. A
+    Blighting Strike rolled from that button already rolls its Hope die for
+    exactly this reason.
+  - Nothing is posted to chat: the rule is not a choice, costs nothing, and fires
+    on a good fraction of a wizard's attacks.
 - **Attack of Opportunity** (`src/daggerheart/attack-of-opportunity.ts`) — the
   Warrior's (SRD p.23) "If an adversary within Melee range attempts to leave that
   range, make a reaction roll using a trait of your choice against their
@@ -2442,6 +2500,35 @@ loads).
   Installed from `module.ts` at **setup** (`game.system.api` is only filled in the
   system's own `init`); rules are registered by features during `init`, so order
   between them doesn't matter.
+- **Damage modifiers** (`src/daggerheart/damage-modifiers.ts`) — the single
+  wrapper around `DamageRoll.temporaryModifierBuilder` behind every rule that adds
+  a row to the damage dialog. Features register with
+  `onDamageModifiers({ id, add })`, where `add(config, modifiers)` writes its own
+  key into the map. Extracted from `slayer.ts` when Face Your Fear arrived — by
+  then `hex.ts` had quietly become a *third* patcher of the same static, which is
+  exactly the drift the one-patch-many-rules rule exists to stop.
+  - **Why this list.** `config.modifiers` is the system's bucket for "something
+    other than the action's own dice is joining this roll": Bardic Rally and the
+    weapon features (Massive, Powerful, Brutal, Serrated) live in it. Joining it
+    buys three things no hand-rolled term push does — a **labelled row** in the
+    damage dialog (a `<select>` for an entry with `values`, a ticked checkbox for
+    one with `enabled`), the **live formula preview** (the dialog re-derives from
+    `constructFormula` on every change), and the **critical bonus**, since
+    `constructFormula` sums `formulaData.roll.dice` after both modifier passes.
+  - **Wrapping is necessary, not preferred**: the builder ends with
+    `config.modifiers = mods`, replacing the object wholesale, so anything a
+    `daggerheart.preRoll` listener put there is thrown away a few lines later.
+    Wrapped *after* the original for the same reason.
+  - Callbacks only run for the **main damage part applied to Hit Points**
+    (`constructFormula` guards them with `isDamage && applyTo === hitPoints`), so
+    a rule that could not act on such a part should decline rather than register a
+    row that does nothing.
+  - **The bet**: every call site of `temporaryModifierBuilder` in the system is
+    flagged "To Remove When Reaction System". That bet was already taken for
+    Slayer Dice; concentrating it here means one wrapper to move when the system
+    replaces the mechanism, rather than one per feature. Patched immediately at
+    `init` rather than at `setup` — the class comes off `CONFIG.Dice`, which the
+    system assigns during its own script load.
 - **Damage landing** (`src/daggerheart/damage-landing.ts`) — the single wrapper
   around `DamageField.applyDamage` behind every rule that fires when damage lands.
   Features register with `onDamageLanding({ id, before, after })`. Extracted from
@@ -2768,14 +2855,14 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
     Tracker under Sage, Not Good Enough under Blade, Not This Time and Strange
-    Patterns under Wizard,
+    Patterns under Wizard, Face Your Fear under Wizard,
     Attack of Opportunity and
     Slayer under Warrior, Commune, Witch's Charm, Hex, Herbal Remedies and
     Tethered Talisman under Witch). A subclass
     has no home of
     its own, so its rules are filed under its parent class in a group of their own — Hybrid Form under
     Blood Hunter, Beastbound under Ranger, Slayer (Call of the Slayer) under
-    Warrior, Hedge Witch under Witch. All four
+    Warrior, School of War under Wizard, Hedge Witch under Witch. All four
     content tabs render
     the *same* template from data in `src/apps/automation-catalog.ts`, so adding a
     switch is one `CatalogSetting` in the right entry's `groups`. `settingKeys` is

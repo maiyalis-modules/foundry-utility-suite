@@ -291,6 +291,18 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // World-scoped for a plainer reason than most: this one changes what a damage
+  // roll totals, and a per-client answer would leave the GM and the player
+  // reading different numbers off the same hit.
+  game.settings.register(MODULE_ID, SETTINGS.faceYourFearDamage, {
+    name: "EE.Settings.FaceYourFearDamage.Name",
+    hint: "EE.Settings.FaceYourFearDamage.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   // World-scoped like the others, and for a further reason: this one decides
   // whether an ActiveEffect gets written to a sheet, and a per-client answer
   // would let one player's rite exist and another's not. Read at activation and

@@ -68,7 +68,9 @@
  *   which the damage dialog renders as a labelled `<select>` per entry and
  *   `constructFormula` applies through each entry's `callback`. This is the
  *   mechanism behind Bardic Rally and the weapon features, and it fits Slayer
- *   Dice exactly, so the damage half needs no UI of its own at all.
+ *   Dice exactly, so the damage half needs no UI of its own at all. The wrapper
+ *   around that builder lives in `damage-modifiers.ts`; it was this file's until
+ *   Face Your Fear became the second rule wanting a row.
  * - **Attack.** The D20 dialog has no such mechanism — only the free-text
  *   situational bonus, which belongs to the player. So one row is injected into
  *   its Modifiers fieldset on `renderD20RollDialog`, in the same shape as the
@@ -100,6 +102,7 @@ import { LOG_PREFIX, MODULE_ID, SETTINGS } from "../constants.js";
 import { escapeHtml } from "../utils/escape-html.js";
 import { isWriter } from "../utils/is-writer.js";
 import { rollingCharacter } from "./attack-action.js";
+import { onDamageModifiers } from "./damage-modifiers.js";
 import type { DualityOutcomeContext } from "./duality-outcome.js";
 import { findGrantingItem, registerFeature, type FeatureMatch } from "./feature-registry.js";
 import { registerRollWindow } from "./roll-pipeline.js";
@@ -538,35 +541,6 @@ function addDamageModifier(config: AnyObject): void {
   };
 }
 
-/**
- * Wrap the builder that fills `config.modifiers`.
- *
- * After the original rather than instead of it: `DamageRoll.temporaryModifierBuilder`
- * *assigns* `config.modifiers`, so anything added first would be thrown away.
- */
-function patchDamageModifier(): void {
-  const DamageRoll = CONFIG["Dice"]?.["daggerheart"]?.["DamageRoll"] as AnyObject | undefined;
-  const original = DamageRoll?.["temporaryModifierBuilder"];
-  if (typeof original !== "function") {
-    console.warn(
-      `${LOG_PREFIX} ${LABEL}: no temporaryModifierBuilder to patch — dice can't be spent on damage.`,
-    );
-    return;
-  }
-
-  DamageRoll!["temporaryModifierBuilder"] = function (this: AnyObject, config: AnyObject): unknown {
-    const modifiers = original.call(this, config);
-
-    try {
-      addDamageModifier(config);
-    } catch (error) {
-      // A failure here costs the offer, not the damage roll.
-      console.warn(`${LOG_PREFIX} ${LABEL}: could not offer the dice on this damage roll.`, error);
-    }
-
-    return modifiers;
-  };
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Taking the dice off the card                                               */
@@ -722,8 +696,8 @@ function patchSessionRefresh(): void {
  */
 export function registerSlayer(): void {
   registerGain();
+  onDamageModifiers({ id: FEATURE_ID, add: (config) => addDamageModifier(config) });
   patchAttackModifier();
-  patchDamageModifier();
   patchSessionRefresh();
 
   Hooks.on("renderD20RollDialog", (app: AnyObject, element: HTMLElement) => {

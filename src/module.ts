@@ -24,7 +24,9 @@ import { registerCloseKnit } from "./daggerheart/close-knit.js";
 import { registerCommune } from "./daggerheart/commune.js";
 import { registerCompanion } from "./daggerheart/companion.js";
 import { registerCrimsonRite } from "./daggerheart/crimson-rite.js";
+import { registerDamageModifiers } from "./daggerheart/damage-modifiers.js";
 import { registerDualityOutcome } from "./daggerheart/duality-outcome.js";
+import { registerFaceYourFear } from "./daggerheart/face-your-fear.js";
 import { registerFearless } from "./daggerheart/fearless.js";
 import { registerFeatureAsk } from "./daggerheart/feature-ask.js";
 import { registerFelineInstincts } from "./daggerheart/feline-instincts.js";
@@ -191,6 +193,11 @@ Hooks.once("init", async () => {
   // half of this one already. It hooks `preUseAction`, the system's rest dialog
   // and `preUpdateItem`, so it takes no part in any ordering.
   registerStrangePatterns();
+  // Not a roll window either: a passive rider that adds dice to a damage roll
+  // through the system's own modifier list. It reads the attack's settled
+  // Hope/Fear result off the damage config, which is long after every window
+  // that could rewrite one, so its place in this list costs nothing.
+  registerFaceYourFear();
   // Not a roll window either, and not a card that can be pressed at all: a
   // passive rule that raises a consumable's healing formula before it is rolled.
   // It patches one of the system's action fields directly, and waits for `setup`
@@ -216,6 +223,11 @@ Hooks.once("init", async () => {
   // features, so every rule they register is already listed — though the patch
   // itself waits for `setup`, so the order is only tidiness.
   registerDamageLanding();
+  // The single wrapper behind every rule that adds a row to the damage dialog.
+  // After the features, so every rule they register is already listed — though
+  // this patch goes on immediately, since it reads the roll class off
+  // `CONFIG.Dice`, which the system fills during its own `init`.
+  registerDamageModifiers();
   // The single wrapper behind every rule that changes what a hit marks. Unlike
   // the one above, this patch goes on immediately — `CONFIG.Actor.documentClass`
   // is assigned at script load — so it must be in place before anything can be

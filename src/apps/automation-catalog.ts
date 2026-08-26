@@ -306,6 +306,21 @@ const CLASSES: Catalog = {
             },
           ],
         },
+        {
+          // Face Your Fear is the School of War subclass's foundation feature,
+          // and its two upgrades are the same rule with a bigger number — one
+          // switch covers all three. Same filing rule as Beastbound under Ranger
+          // and Call of the Slayer under Warrior: a subclass has nowhere of its
+          // own here, and its parent class is unambiguous.
+          legend: "EE.Automation.SchoolOfWarLegend",
+          settings: [
+            {
+              key: SETTINGS.faceYourFearDamage,
+              name: "EE.Settings.FaceYourFearDamage.Name",
+              hint: "EE.Settings.FaceYourFearDamage.Hint",
+            },
+          ],
+        },
       ],
     },
     fromVoid("Assassin"),
