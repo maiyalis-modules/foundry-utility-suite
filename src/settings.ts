@@ -414,6 +414,21 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // World-scoped, and here it is the only coherent answer rather than house
+  // style: the bonus is added while a roll is being built, on whichever client
+  // is building it, so a per-user answer would have the same attack land at two
+  // different numbers depending on who threw it. Nothing is written into
+  // prepared data — the next roll re-reads the hex — so switching it off needs
+  // no reconciliation, and leaves any effect already placed as an inert label.
+  game.settings.register(MODULE_ID, SETTINGS.hexCondition, {
+    name: "EE.Settings.Hex.Name",
+    hint: "EE.Settings.Hex.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   // World-scoped, and not merely for consistency: this changes a number a chat
   // card prints for the whole table, so a per-user answer would have two people
   // reading different totals off the same potion. Nothing is written into

@@ -44,6 +44,15 @@ import { escapeHtml } from "../utils/escape-html.js";
  */
 export const PROMPT_TIMEOUT_MS = 30_000;
 
+/**
+ * How often the countdown's seconds readout is refreshed.
+ *
+ * Shorter than a second on purpose. An interval of exactly 1000 ms started at an
+ * arbitrary moment shows each number for a second but changes it up to a second
+ * after it should, which reads as a clock that is lagging the bar beside it.
+ */
+const TICK_MS = 250;
+
 /** One offer, as the dialog needs it: localized, flat and serializable. */
 export interface PromptOffer {
   /** The feature id, which is also the checkbox name and the answer's value. */
@@ -54,6 +63,16 @@ export interface PromptOffer {
   hint?: string;
   /** The granting Item's name, so the player can see which card this came from. */
   itemName: string;
+  /**
+   * The granting Item's artwork, shown beside the offer.
+   *
+   * Optional, and with **no placeholder** when it is absent — unlike a prompt
+   * whose choices are people, where a missing portrait still leaves a face-shaped
+   * hole in a column of faces. A card without art is rare enough that a stand-in
+   * icon would say "this feature has a picture" and then show something that
+   * isn't it.
+   */
+  img?: string;
   /**
    * Localized replacements for the two buttons, for a feature whose choice reads
    * better as two named outcomes than as "use it" / "don't".
@@ -147,12 +166,24 @@ function renderHeadline(headline: PromptHeadline): string {
 }
 
 /**
- * One row of the dialog: what the feature is, and which card it came from.
+ * One row of the dialog: the card's artwork, what the feature is, and which card
+ * it came from.
  *
- * The card's name is shown only when it differs from the feature's label — for
+ * The card's *name* is shown only when it differs from the feature's label — for
  * most features they are the same string, and "Blood Maledict (Blood Maledict)"
  * is noise. It earns its place when a homebrew rewrite has been flagged into an
- * SRD feature's automation and the two names genuinely diverge.
+ * SRD feature's automation and the two names genuinely diverge. The artwork is
+ * shown whenever there is any, since it is never a repetition of anything else
+ * on screen and is how a player recognises the card without reading.
+ *
+ * Square rather than round, for the reason `chooseOne`'s rows give: this is an
+ * object, and a cropped circle reads as a face.
+ *
+ * Returns the two halves of a flex row — art, then a text block. Both callers
+ * wrap it in a flex container of their own, which is also why the hint's `<p>`
+ * now lives inside a `<div>` rather than directly inside the single-offer
+ * paragraph it used to be nested in (a `<p>` inside a `<p>` is unnested by the
+ * parser, which quietly broke the spacing).
  */
 function describeOffer(offer: PromptOffer): string {
   const source =
@@ -160,9 +191,115 @@ function describeOffer(offer: PromptOffer): string {
       ? ` <span class="hint">(${escapeHtml(offer.itemName)})</span>`
       : "";
 
-  return `<strong>${escapeHtml(offer.label)}</strong>${source}${
+  const art = offer.img
+    ? `<img class="ee-feature-offer-art" src="${escapeHtml(
+        offer.img,
+      )}" alt="" draggable="false">`
+    : "";
+
+  return `${art}<div class="ee-feature-offer-text"><strong>${escapeHtml(
+    offer.label,
+  )}</strong>${source}${
     offer.hint ? `<p class="hint">${escapeHtml(offer.hint)}</p>` : ""
-  }`;
+  }</div>`;
+}
+
+/**
+ * Draw the countdown between the dialog's content and its buttons.
+ *
+ * The last thing read before the decision, and out of the way of making it. It
+ * exists because the timeout is otherwise invisible: a prompt that answers
+ * "none" for you after half a minute, with nothing on screen saying so, reads as
+ * a dialog you can take your time over right up until it vanishes.
+ *
+ * **The depletion is one CSS animation, not a JS interval.** Script sets exactly
+ * one thing on it — the duration — because that is the one part the stylesheet
+ * cannot know: it is what is *left* of the timeout at the moment the bar is
+ * drawn, which is not the whole of it if the dialog has re-rendered. Everything
+ * else (the shrink, the colour turning as it empties) is in `styles/module.css`,
+ * where a `scaleX` on a `transform-origin: left` fill never relayouts and keeps
+ * running smoothly while this client is busy doing something else.
+ *
+ * **The seconds beside it do need a tick**, and it is the only one here. A bar
+ * answers "roughly how long" at a glance; the number answers "can I read this
+ * hint first", which is the question somebody actually has. {@link TICK_MS} is
+ * deliberately shorter than a second so the digit turns over when it should
+ * rather than up to a second late — four writes of one short string per second,
+ * against an animation the compositor is already running. The interval stops
+ * itself once the element leaves the document, so a dialog closed by any route
+ * cleans up even if nobody calls the returned stopper.
+ *
+ * DialogV2's own markup is `<form>` → `.dialog-content` → `footer.form-footer`,
+ * so the bar goes immediately before the footer. The fallback appends to the
+ * content instead: a countdown in a slightly odd place is worth more than none,
+ * and the same judgement `adaptability.ts` makes about its chat-card anchor.
+ *
+ * @returns A function that stops the tick.
+ */
+function installTimerBar(root: HTMLElement, remainingMs: number): () => void {
+  // A re-render rebuilds the form, so there is normally nothing to replace —
+  // but a dialog rendered twice before the browser repaints would otherwise
+  // stack two bars, one of them running on a stale clock.
+  root.querySelector(".ee-prompt-timer")?.remove();
+
+  const left = Math.max(0, remainingMs);
+  const deadline = Date.now() + left;
+
+  const bar = document.createElement("div");
+  bar.className = "ee-prompt-timer";
+
+  const head = document.createElement("div");
+  head.className = "ee-prompt-timer-head";
+
+  const label = document.createElement("span");
+  label.className = "ee-prompt-timer-label";
+  // `textContent`, not markup: the strings are ours, but building them as HTML
+  // would invite the next person to interpolate a name into one.
+  label.textContent = game.i18n.localize("EE.Features.TimeRemaining");
+
+  const value = document.createElement("span");
+  value.className = "ee-prompt-timer-value";
+  // The readout is what a screen reader should announce, not the bar: `timer`
+  // carries an implicit `aria-live: off`, so it is read on request rather than
+  // interrupting four times a second.
+  value.setAttribute("role", "timer");
+
+  const track = document.createElement("div");
+  track.className = "ee-prompt-timer-track";
+  track.setAttribute("aria-hidden", "true");
+
+  const fill = document.createElement("div");
+  fill.className = "ee-prompt-timer-fill";
+  fill.style.animationDuration = `${left}ms`;
+
+  track.append(fill);
+  head.append(label, value);
+  bar.append(head, track);
+
+  const footer = root.querySelector("footer.form-footer");
+  if (footer) footer.before(bar);
+  else (root.querySelector(".dialog-content") ?? root).append(bar);
+
+  let ticker: ReturnType<typeof setInterval> | undefined;
+  const stop = (): void => {
+    if (ticker !== undefined) clearInterval(ticker);
+    ticker = undefined;
+  };
+
+  const show = (): void => {
+    // Nothing left to update, and nothing to leak: the dialog has gone.
+    if (!value.isConnected) return stop();
+
+    // Rounded **up**, so the last whole second on screen is "1s" rather than a
+    // "0s" the player still has time to answer during.
+    const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    value.textContent = game.i18n.format("EE.Features.TimeRemainingSeconds", { seconds });
+    if (seconds <= 0) stop();
+  };
+
+  show();
+  ticker = setInterval(show, TICK_MS);
+  return stop;
 }
 
 /**
@@ -180,6 +317,9 @@ function describeOffer(offer: PromptOffer): string {
  * resolved can only be answered once, and expiring it silently loses the answer.
  * Same judgement `chooseOne` and `chooseFromList` make by not coming through here
  * at all; this flag is for a prompt that needs the rest of the wiring.
+ *
+ * A timed dialog also gets the countdown ({@link installTimerBar}); an untimed
+ * one gets nothing, since there is nothing for it to count down to.
  */
 async function waitWithTimeout(
   config: AnyObject,
@@ -188,6 +328,11 @@ async function waitWithTimeout(
 ): Promise<unknown> {
   let dialog: AnyObject | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let stopCountdown: (() => void) | undefined;
+
+  // Read before the timer is started rather than inside it, so the bar and the
+  // deadline measure from the same instant.
+  const startedAt = Date.now();
 
   // Not merely un-raced when `untimed`: the timer closes the dialog when it
   // fires, so one started and then ignored would still shut the question down
@@ -213,11 +358,29 @@ async function waitWithTimeout(
     rejectClose: false,
     render: (_event: Event, instance: AnyObject) => {
       dialog = instance;
+      const root = instance?.["element"] as HTMLElement | undefined;
+
+      // The countdown, in a `try` of its own and before the caller's wiring: a
+      // bar that failed to draw must not cost the dialog its behaviour, and a
+      // caller's listener that throws must not leave the clock invisible. The
+      // remaining time is measured rather than assumed, because a re-render
+      // redraws the bar while the deadline has been running the whole time.
+      if (root && !untimed) {
+        try {
+          // A re-render replaces the bar, so the tick behind the old one goes
+          // first — it would otherwise write to a detached element until it
+          // noticed, and two of them would fight over one readout.
+          stopCountdown?.();
+          stopCountdown = installTimerBar(root, PROMPT_TIMEOUT_MS - (Date.now() - startedAt));
+        } catch (error) {
+          console.warn(`${LOG_PREFIX} Feature prompt: could not draw the countdown.`, error);
+        }
+      }
+
       // A dialog whose content needs live behaviour (see `chooseUpTo`) wires it
       // here, on the same callback, rather than through a second one the caller
       // would have to remember not to pass — `render` is spread away above.
       try {
-        const root = instance?.["element"] as HTMLElement | undefined;
         if (root && onRender) onRender(root);
       } catch (error) {
         // The dialog is already on screen and answerable; losing a nicety in it
@@ -231,6 +394,7 @@ async function waitWithTimeout(
     return timeout ? await Promise.race([answered, timeout]) : await answered;
   } finally {
     if (timer !== undefined) clearTimeout(timer);
+    stopCountdown?.();
   }
 }
 
@@ -256,7 +420,7 @@ export async function chooseOffers(request: PromptRequest): Promise<Set<string>>
     const answer = await waitWithTimeout({
       classes,
       window: { title },
-      content: `${introHtml}<p class="ee-feature-offer-single">${describeOffer(only)}</p>`,
+      content: `${introHtml}<div class="ee-feature-offer-single">${describeOffer(only)}</div>`,
       buttons: [
         {
           action: "use",

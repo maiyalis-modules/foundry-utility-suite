@@ -75,6 +75,7 @@ export function toPromptOffers<C extends FeatureContextBase>(
     label: game.i18n.localize(offer.feature.labelKey),
     hint: offer.feature.hintKey ? game.i18n.localize(offer.feature.hintKey) : undefined,
     itemName: String(offer.item["name"] ?? ""),
+    img: offer.item["img"] ? String(offer.item["img"]) : undefined,
     useLabel: offer.feature.useLabelKey
       ? game.i18n.localize(offer.feature.useLabelKey)
       : undefined,

@@ -293,6 +293,7 @@ async function ask(roller: AnyObject, config: AnyObject, witch: AnyObject): Prom
           { roller: who },
         ),
         itemName: String(card?.["name"] ?? LABEL),
+        img: card?.["img"] ? String(card["img"]) : undefined,
         useLabel: game.i18n.localize("EE.Features.WitchsCharm.Spend"),
         skipLabel: game.i18n.localize("EE.Features.WitchsCharm.Keep"),
       },

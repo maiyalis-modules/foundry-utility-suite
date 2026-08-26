@@ -334,19 +334,22 @@
   margin: 0.5rem 0;
 }
 
+/* Checkbox, the card's artwork, then the feature. A flex row rather than the
+ * two-column grid this used to be: the label, the card name and the hint are now
+ * one block (`.ee-feature-offer-text`), so there is nothing left for a grid to
+ * place — and the art column would have made it three. */
 .ee-feature-offers .ee-feature-offer {
-  display: grid;
-  grid-template-columns: auto 1fr;
+  display: flex;
+  align-items: flex-start;
   gap: 0.5rem;
-  align-items: baseline;
   cursor: pointer;
 }
 
-/* The hint sits under the label rather than beside the checkbox, so a wrapped
- * description lines up with the feature name instead of the tick box. */
-.ee-feature-offers .ee-feature-offer .hint {
-  grid-column: 2;
-  margin: 0.15rem 0 0;
+/* Nudged down to sit on the first line of text rather than at its very top,
+ * which `flex-start` alone does not do — the box is shorter than the line. */
+.ee-feature-offers .ee-feature-offer > input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin-top: 0.25rem;
 }
 
 /* Hold these dialogs to a reading width. DialogV2 defaults to `width: auto`, so
@@ -421,9 +424,40 @@
   letter-spacing: 0.08em;
 }
 
-/* The offer below the banner, when there is only one and so no checkbox list. */
+/* The offer below the banner, when there is only one and so no checkbox list.
+ * The same row as a checkbox offer, minus the checkbox. */
 .ee-feature-prompt .ee-feature-offer-single {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
   margin: 0;
+}
+
+/* The card's own artwork. Square, not the circular portrait the banner uses, for
+ * the reason the choice rows give further down: this is an object, and a cropped
+ * circle reads as a face. Sized between those two — smaller than a portrait,
+ * since it accompanies a sentence rather than being the subject of one. */
+.ee-feature-prompt .ee-feature-offer-art {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border: none;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 25%);
+}
+
+/* Takes the rest of the row. `min-width: 0` so a long hint wraps instead of
+ * pushing the dialog wider than the reading width set above. */
+.ee-feature-prompt .ee-feature-offer-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The hint sits under the label rather than beside it, so a wrapped description
+ * lines up with the feature name instead of the artwork. */
+.ee-feature-prompt .ee-feature-offer-text .hint {
+  margin: 0.15rem 0 0;
 }
 
 /* The "pick up to N of these people" list (chooseUpTo in feature-prompt.ts).
@@ -493,6 +527,84 @@
 .ee-feature-prompt .ee-feature-choice:has(input:disabled):hover {
   border-color: transparent;
   background: none;
+}
+
+/* The countdown on any prompt that answers "none" for the player if they say
+ * nothing (waitWithTimeout in src/daggerheart/feature-prompt.ts). It sits between
+ * the dialog's content and its buttons: the last thing read before the decision,
+ * and out of the way of making it.
+ *
+ * The depletion is one CSS animation rather than a JS interval, so it stays
+ * smooth while the client is busy and costs nothing when it isn't. Script sets
+ * only the duration — what is left of the timeout when the bar is drawn — and
+ * overrides the value here, which is a fallback for a bar somehow drawn without
+ * one. `scaleX` on a fill anchored left rather than an animated `width`, so the
+ * browser never relayouts the dialog thirty times a second.
+ *
+ * The colour holds steady for most of the run and turns as it empties, which is
+ * the half of "time remaining" a shrinking bar alone does not say — how much is
+ * left matters least at the start. */
+.ee-feature-prompt .ee-prompt-timer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0.75rem 0 0;
+}
+
+/* Caption on the left, seconds on the right, bar underneath both. */
+.ee-feature-prompt .ee-prompt-timer-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.ee-feature-prompt .ee-prompt-timer-label {
+  font-size: var(--font-size-11, 0.7rem);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+/* Tabular figures so the readout does not jiggle as it drops from two digits to
+ * one, which at four updates a second is very visible. */
+.ee-feature-prompt .ee-prompt-timer-value {
+  font-size: var(--font-size-12, 0.75rem);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.ee-feature-prompt .ee-prompt-timer-track {
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-dark, #000);
+  background: rgb(0 0 0 / 35%);
+}
+
+.ee-feature-prompt .ee-prompt-timer-fill {
+  height: 100%;
+  transform-origin: left center;
+  background-color: var(--golden, #f3c267);
+  animation: ee-prompt-timer-deplete 30s linear forwards;
+}
+
+/* `transform` is named only at the two ends, so it interpolates evenly across
+ * the whole run however many colour stops sit between them. */
+@keyframes ee-prompt-timer-deplete {
+  from {
+    transform: scaleX(1);
+    background-color: var(--golden, #f3c267);
+  }
+
+  70% {
+    background-color: var(--golden, #f3c267);
+  }
+
+  to {
+    transform: scaleX(0);
+    background-color: #e0553f;
+  }
 }
 
 /* --- Roll request controls -------------------------------------------------- */
@@ -959,6 +1071,45 @@
 /* Disabled only while a reroll is in flight, which is brief — so this says
  * "working", not "unavailable", and the button is never drawn disabled. */
 .ee-adaptability-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* Hex's lift control (src/daggerheart/hex.ts), hung under the announcement card
+ * and drawn for the GM alone.
+ *
+ * Same measurements and the same quiet full-width treatment as the Adaptability
+ * button above, since the two are the module's only chat-card controls and a
+ * second size would read as belonging to something else. Its own classes rather
+ * than a shared one: these are two unrelated features, and a change made for one
+ * of them should not silently restyle the other. */
+.ee-hex {
+  display: flex;
+  margin-top: 8px;
+}
+
+.ee-hex-button {
+  flex: 1;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid var(--golden-40, rgb(243 194 103 / 25%));
+  border-radius: 5px;
+  background: var(--golden-40, rgb(243 194 103 / 25%));
+  color: var(--golden, #f3c267);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.ee-hex-button:hover:not(:disabled) {
+  border-color: var(--golden, #f3c267);
+}
+
+/* Disabled only while the lift is in flight, which is brief — so this says
+ * "working", not "unavailable", and the button is never drawn disabled. */
+.ee-hex-button:disabled {
   cursor: default;
   opacity: 0.5;
 }

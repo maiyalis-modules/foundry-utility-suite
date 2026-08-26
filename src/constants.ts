@@ -300,6 +300,23 @@ export const SETTINGS = {
    */
   witchsCharm: "witchsCharm",
   /**
+   * Master switch for **Hex** (Witch, *Void for Daggerheart*): when a creature
+   * makes a character within Close range mark Hit Points, a witch holding the
+   * card is asked whether to mark a Stress to Hex it — after which every action
+   * and damage roll aimed at that creature gains her tier, until the GM spends
+   * Fear to lift it or she hexes something else. See `daggerheart/hex.ts`.
+   *
+   * World-scoped and **on** by default. World scope is the only coherent answer:
+   * the bonus is added while a roll is being built, on whichever client is
+   * making it, so a per-user preference would have the same attack hit at two
+   * different numbers depending on who threw it. Switching it off leaves the
+   * card's own "Mark Stress" button doing exactly what the Void ships — marking
+   * the Stress and placing a label with no `changes` on it — which is the manual
+   * fallback either way, and leaves any hex already standing as an inert marker
+   * to be deleted by hand.
+   */
+  hexCondition: "hexCondition",
+  /**
    * Master switch for **Herbal Remedies** (Hedge Witch, *Void for Daggerheart*):
    * a consumable that clears Hit Points or Stress clears one more of them. Not a
    * card that can be pressed — the rule fires on whichever consumable happens to
@@ -637,6 +654,39 @@ export const FLAGS = {
    * rule, and two Hedge Witches can tether the same person.
    */
   tetheredTalisman: "tetheredTalisman",
+  /**
+   * The **Hex** a Witch has laid, on the ActiveEffect carried by the hexed
+   * creature: `{ sourceUuid }`, naming the witch.
+   *
+   * The effect *is* the condition — there is no second record anywhere. Its
+   * presence is what every action and damage roll aimed at that creature reads
+   * to find the bonus, its absence is what lets another be laid, and deleting it
+   * from the sheet is the "remove it when the scene ends" the rule leaves to the
+   * table. Written by the GM's client on request (see `daggerheart/gm-effects.ts`),
+   * because the creature hexed is almost always an adversary.
+   *
+   * Keyed by the *witch* rather than the creature, for the same reason as
+   * {@link FLAGS.tetheredTalisman}: one hex per witch is the rule, and two
+   * Witches can hex the same adversary — each contributing her own tier.
+   *
+   * Deliberately carries no `changes`. "A bonus to rolls made *against* this
+   * creature" is a property of one roll, not of the creature, which is exactly
+   * why {@link FLAGS.giftedTracker} carries none either.
+   */
+  hex: "hex",
+  /**
+   * The **Hex** announcement card: `{ witchUuid, witchName, creatureUuid,
+   * creatureName }`, which is what the GM's "spend Fear to lift it" button acts
+   * on.
+   *
+   * A separate key from {@link FLAGS.hex} because it means a different thing on a
+   * different document — one is the condition, the other is a message about it.
+   * The names are stored only so the card still reads correctly when the actors
+   * behind it are gone; everything the button *acts* on is re-resolved from the
+   * uuids at the moment it is pressed, including the Spellcast trait that sets
+   * the price.
+   */
+  hexCard: "hexCard",
   /**
    * Marks an ActiveEffect as one **Gifted Tracker** tracking, and records what is
    * being tracked: `{ description, hope, quarry: [{ uuid, name, img }] }`.

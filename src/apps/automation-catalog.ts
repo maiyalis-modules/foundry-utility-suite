@@ -338,6 +338,11 @@ const CLASSES: Catalog = {
               name: "EE.Settings.WitchsCharm.Name",
               hint: "EE.Settings.WitchsCharm.Hint",
             },
+            {
+              key: SETTINGS.hexCondition,
+              name: "EE.Settings.Hex.Name",
+              hint: "EE.Settings.Hex.Hint",
+            },
           ],
         },
         {

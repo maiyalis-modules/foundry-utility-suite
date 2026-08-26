@@ -453,6 +453,21 @@ loads).
     since a top-down marker reads as nothing masked into a circle; a missing one
     falls back to core's `icons/svg/mystery-man.svg`. Everything in
     `PromptRequest` stays flat, localized and JSON-safe — it has to cross a socket.
+  - **The offer carries its card's artwork.** `PromptOffer.img` is the granting
+    Item's `img`, drawn square (not the banner's circle: this is an object, and a
+    cropped circle reads as a face) to the left of the label. **No placeholder
+    when it is absent** — unlike `chooseUpTo`, whose rows are people and where a
+    missing portrait still leaves a face-shaped hole in a column of faces. It is
+    filled by `toPromptOffers` for anything asked out of the registry, and by
+    hand in the windows that build a `PromptOffer` themselves (`witchs-charm.ts`,
+    `hex.ts`, `tethered-talisman.ts`, `blood-spike.ts`) — add it there when you
+    write the next one. The name beside it is still shown only when it *differs*
+    from the feature label; the artwork always is, since it repeats nothing else
+    on screen and is how a player recognises a card without reading it.
+    - Adding it turned both offer shapes from a two-column grid into a flex row
+      of art plus one `.ee-feature-offer-text` block, which also fixed a latent
+      bug: the single-offer shape wrapped `describeOffer`'s `<p class="hint">` in
+      a `<p>` of its own, and the parser unnests a `<p>` inside a `<p>`.
     **No roll totals in a prompt.** Neither the banner nor the `intro` sentence
     names the number: whether the attack landed is what a reacting player decides
     on, the total changes nothing they can do about it, and the chat card may be
@@ -461,6 +476,38 @@ loads).
   - Dismissal, Escape and the 30s timeout all mean "leave the roll alone" — every
     caller is mid-pipeline holding something back, so the safe answer is always to
     let the unmodified outcome through.
+  - **The timeout is drawn, not merely enforced.** `waitWithTimeout` installs a
+    "Time remaining" bar between the dialog's content and its buttons on every
+    prompt it raises, and none on an `untimed` one — a clock that answers "none"
+    for you after half a minute reads as a question you can take your time over
+    right up until it vanishes. One place, so a new prompt shape gets it by
+    coming through here; the shapes that deliberately have no timer
+    (`chooseOne`, `chooseFromList`, `chooseFromRadios`, `askText`, `showNotice`)
+    never touch that function and so show nothing.
+    - **The depletion is one CSS animation.** Script sets exactly one property
+      on the bar, `animationDuration`, because it is the only part the stylesheet
+      cannot know: what is *left* of the timeout at the moment it is drawn, which
+      is not the whole of it after a re-render. Everything else lives in
+      `.ee-prompt-timer*` in `styles/module.css`, where a `scaleX` on a fill
+      anchored left never relayouts and keeps running smoothly while this client
+      is busy. Don't replace it with an interval.
+    - **The seconds beside it are the only tick**, at `TICK_MS` (250 ms) — short
+      on purpose, since a 1000 ms interval started at an arbitrary moment shows
+      each number for a second but changes it up to a second late, which reads as
+      a clock lagging the bar next to it. Rounded **up**, so the last whole
+      second reads "1s" rather than a "0s" the player can still answer during.
+      `installTimerBar` returns a stopper, which `waitWithTimeout` calls in its
+      `finally` and again before a re-render replaces the bar; the tick also
+      stops itself once its element leaves the document, so a dialog closed by
+      any route cleans up regardless. The readout carries `role="timer"` (whose
+      implicit `aria-live: off` keeps it from interrupting four times a second)
+      and the bar is `aria-hidden`, since the two say the same thing.
+    - Anchored **before `footer.form-footer`** — DialogV2's markup is `<form>` →
+      `.dialog-content` → `footer.form-footer` — falling back to the end of the
+      content if that ever moves, on the same reasoning as `adaptability.ts`'s
+      chat-card anchor: a countdown in a slightly odd place beats none. Drawn in
+      a `try` of its own, *before* the caller's `onRender` wiring, so neither can
+      cost the other.
   - **The `adversaryAttack` window** (`adversary-attack.ts`) — reactions to an
     adversary landing a hit. Differs from `dualityOutcome` in three ways that
     shape the code: the reacting character **is not the roller** (so the window
@@ -1535,6 +1582,94 @@ loads).
     them. A multi-target roll that succeeds now hits every target, which costs
     nothing to reason about because it only read as a failure by missing all of
     them.
+- **Hex** (`src/daggerheart/hex.ts`) — the Void's Witch class feature,
+  `Compendium.the-void-unofficial.classes.Item.4iy45CFDxqDrb5QN`: "when a
+  creature causes you or an ally within Close range to mark any number of Hit
+  Points, you can mark a Stress to Hex them. Action and damage rolls against a
+  Hexed creature gain a bonus equal to your tier." World setting `hexCondition`,
+  **on** by default, filed under Witch beside Witch's Charm.
+  - **What the Void ships is right as far as it can go.** One `effect` action,
+    "Mark Stress", charging 1 Stress and applying an embedded ActiveEffect named
+    "Hex" whose `system.changes` is empty. The card is left entirely alone,
+    button and effect both. The empty `changes` is not an oversight: *"a bonus to
+    rolls made against this creature"* is a property of one roll, not of any
+    character, so no ActiveEffect can carry it — the same wall Gifted Tracker
+    documents and for the same reason.
+  - **The trigger needs two seams, because neither half knows the other's
+    answer.** *How many Hit Points were marked* is only settled after
+    `Actor#takeDamage` has run resistances, thresholds and the armour-slot
+    dialog, which is what `daggerheart.postTakeDamage` reports. *Which creature
+    caused it* is not in that hook at all — `takeDamage` is told about damage,
+    never about who threw it — and lives one level up in the action config
+    (`config.source.actor`). So a `before` rule on `damage-landing.ts` writes down
+    who is about to hurt whom, keyed on the actor uuid, and the `postTakeDamage`
+    handler reads it back and deletes it. Entries are swept after a minute rather
+    than seconds: the armour-slot query between the two seams has a thirty-second
+    timeout of its own. Damage nobody applied — a GM typing a Hit Point onto a
+    sheet — has no attacker attached and deliberately raises nothing.
+  - **The bonus needs two more seams, because the system builds the two rolls
+    differently.** Neither writes anything to a sheet: the bonus is recomputed
+    from the hex every time a roll is built, so lifting the hex un-applies it with
+    nothing to reconcile.
+    - **Action rolls** ride `daggerheart.preRoll` into
+      `config.roll.baseModifiers`, which `D20Roll.applyBaseBonus` deep-clones as
+      its first act and `DualityRoll` inherits — so one hook covers an
+      adversary's d20 and a character's Duality roll alike. It has to be that
+      hook and not `postRollConfiguration`: `D20Roll`'s **constructor** calls
+      `constructFormula`, so the formula is already built by the time the later
+      one fires. The entry is labelled, so it shows in the roll dialog and in the
+      card's breakdown rather than arriving as an unexplained number.
+    - **Damage rolls** wrap `DamageRoll.temporaryModifierBuilder` — the system's
+      own bucket for a per-roll bonus that is not an ActiveEffect, where Rally
+      dice, Massive, Brutal and Serrated already live, and which renders in the
+      damage dialog's **Modifiers** fieldset as a ticked checkbox. Wrapping is
+      necessary rather than tidy: that builder ends with `config.modifiers =
+      mods`, replacing the object wholesale, so anything a `preRoll` listener put
+      there is discarded a few lines later. Several hexes collapse into one entry,
+      because the damage is rolled once however many creatures it is aimed at.
+    - `config.roll` is what tells the two apart. `RollField.prepareConfig` builds
+      it with a formula and no total; `buildEvaluate` replaces it with the
+      finished result. A config whose `roll.total` is a number is an evaluated
+      roll being carried into the damage step, and the action-roll hook leaves it
+      alone. Ours are also tagged and stripped before being re-added, so a roll
+      rebuilt or re-configured ends up with one of each rather than two.
+  - **The hex lives on the hexed creature** as the `gm-effects.ts` marker,
+    flagged `FLAGS.hex` with the witch's uuid. The effect *is* the record; there
+    is no second copy. This is Tethered Talisman's shape rather than Ranger's
+    Focus's, and the difference is the point: the Focus record has to sit on the
+    ranger because the bonus is the ranger's, while here the bonus belongs to the
+    creature and every roll in the party reads it. Keyed by witch, so two Witches
+    can hex the same adversary and each contributes her own tier — read live off
+    her sheet, so a level-up applies to a hex already standing.
+  - **Ending it is two-thirds automated, and the missing third is deliberate.**
+    Hexing again lifts the previous hex, found by the same `game.actors`-plus-
+    current-scene scan Tethered Talisman uses. The GM's clause is a button on the
+    announcement card, drawn for the GM only, spending Fear equal to the witch's
+    Spellcast trait — read live when it is pressed, because the rule names the
+    trait and not the number it had that evening, and refused with the shortfall
+    named when there is not enough. "Otherwise, remove it when the scene ends" is
+    **not** automated: a Daggerheart scene is a fiction boundary, not a canvas one
+    and not a combat, so hanging it on `canvasReady` or on an encounter ending
+    would invent a rule and silently lift a hex the table still counts. The
+    effect's description says when to remove it; deleting it is one click. Same
+    judgement Gifted Tracker makes about "until you stop tracking them".
+  - **Every eligible witch is asked, and the first yes does not settle it** —
+    unlike Witch's Charm, where one rescue is one rescue. Two Witches each spend
+    their own Stress and place their own hex, and the rule gives neither
+    precedence. The person hurt is asked first when they hold the card, since
+    "you" is the clause with nothing to measure. One attack that hurts three party
+    members reaches the handler three times, concurrently, so the claim on a
+    witch's attention is taken synchronously before the socket call — each witch
+    is asked once per damage application, not once per casualty.
+  - **Deliberate silences.** Damage that marks no Hit Points raises nothing,
+    including a hit that marks only Stress. Nobody hexes their own doing — a
+    creature that hurt itself, and a witch asked about damage she caused, are both
+    skipped. Unmeasurable range means no, as everywhere else here. Reaction rolls
+    gain nothing (they are not action rolls); damage is *not* filtered that way,
+    since "damage rolls against a Hexed creature" is unqualified. Healing never
+    gains it. One damage roll serves every target it hit, so a swing that catches
+    a hexed creature and an unhexed one adds the bonus once, to both — which is
+    the system's own arithmetic, and is why the modifier is left tickable.
 - **Herbal Remedies** (`src/daggerheart/herbal-remedies.ts`) — the Hedge Witch
   subclass's foundation feature,
   `Compendium.the-void-unofficial.subclasses.Item.pYtLdnmhKmVtxsIM`. World setting
@@ -2408,8 +2543,8 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
     Tracker under Sage, Not Good Enough under Blade, Attack of Opportunity and
-    Slayer under Warrior, Commune, Witch's Charm, Herbal Remedies and Tethered
-    Talisman under Witch). A subclass
+    Slayer under Warrior, Commune, Witch's Charm, Hex, Herbal Remedies and
+    Tethered Talisman under Witch). A subclass
     has no home of
     its own, so its rules are filed under its parent class in a group of their own — Hybrid Form under
     Blood Hunter, Beastbound under Ranger, Slayer (Call of the Slayer) under

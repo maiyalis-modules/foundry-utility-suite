@@ -270,6 +270,7 @@ async function runBloodSpikeWindow(roll: AnyObject, config: AnyObject): Promise<
           { die: dieFor(actor), marks: marked },
         ),
         itemName: String(item["name"] ?? BLOOD_SPIKE_NAME),
+        img: item["img"] ? String(item["img"]) : undefined,
       },
     ],
   });

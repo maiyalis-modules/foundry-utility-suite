@@ -115,6 +115,9 @@
   "EE.Settings.WitchsCharm.Name": "Witch's Charm",
   "EE.Settings.WitchsCharm.Hint": "Make the Void's Witch class feature \"Witch's Charm\" do what it says. The card ships one action, \"Spend Hope\", and all it does is take 3 Hope — the conversion is left to the table, which by then means walking back the Hope the roller has already been given, handing the GM the Fear they haven't, and arguing with a chat card that has already printed a miss. With this on, a failed action roll pauses just before its card is posted and the question goes to every character within Far range who is holding this feature and has 3 Hope to spend, starting with the roller if it is theirs. Say yes and the roll becomes a success with Fear: the hit is re-decided, the Hope is not granted, the GM gains the Fear instead, and the card posts already reading that way — on every screen, and after a reload. They are asked one at a time and the first yes settles it, so two witches never pay for one rescue. Only a roll the system actually scored can be caught: an attack, or a check the GM entered a Difficulty for. A Difficulty kept in the GM's head leaves nothing to fail against, so nothing is offered, and the card's own button is still there to press by hand. Range is measured on the canvas the way the ruler measures it, so a scene where one of them has no token raises no prompt rather than guessing. Reaction rolls are left alone — they are not action rolls, which is why the system withholds Hope and Fear from them too.",
 
+  "EE.Settings.Hex.Name": "Hex",
+  "EE.Settings.Hex.Hint": "Make the Void's Witch class feature \"Hex\" do what it says. The card ships a \"Mark Stress\" action that charges the Stress and places an effect with no rules on it — which is not the Void's fault: \"a bonus to rolls made against this creature\" is a property of one roll, not of anybody's sheet, so no effect can express it. With this on, whenever a creature makes you or an ally within Close range mark Hit Points, the question goes to every character holding this feature who has a Stress to mark: hex the creature that did it, or let it be. Say yes and every action and damage roll aimed at that creature from then on gains your tier — the whole party's rolls, not only yours — shown as a named modifier in the roll dialog and in the card's breakdown, so nobody is left wondering where a number came from. The prompt waits half a minute and then lets the moment pass, and it only ever appears for damage that really marked Hit Points, so a hit soaked by armour or thresholds interrupts nobody. Hexing something else moves the condition, and the announcement card carries a button only you as GM can see: spend Fear equal to the witch's Spellcast trait to lift it, refused with the shortfall named when there isn't enough. \"Remove it when the scene ends\" is left to you — a scene is a fiction boundary, not a canvas or a combat, and guessing would lift a hex the table still counts. Delete the effect from the creature to end it. Reaction rolls gain nothing, since they are not action rolls, and healing never gains it at all.",
+
   "EE.Settings.HerbalRemedies.Name": "Herbal Remedies",
   "EE.Settings.HerbalRemedies.Hint": "Apply the Void's Hedge Witch subclass feature \"Herbal Remedies\" to consumables: when one clears Hit Points or Stress, it clears one more. The Void ships the card as prose and there is nothing else it could ship, because the rule fires on somebody else's button — whichever potion happens to get drunk. With this on, that extra point is added to the consumable's own formula before it is rolled, so a Minor Health Potion rolls 1d4 + 1 and the number the card prints is the number the sheet moves. That matters more than it sounds: a healing consumable declares no target, so nothing is ever applied automatically and the number is almost always marked off by hand. Hope and Armor Slots are left alone, since the card names Hit Points and Stress, and so is a consumable that clears a resource outright (\"clear all HP and Stress\"), which has no number to raise. \"You or an ally\" is read as: a character using a consumable, in a world where some character has this card. That is deliberately loose — the tighter readings all break at a table where the GM owns every sheet, or between sessions when nobody has a token on a scene — so a world holding both a Hedge Witch and a rival party who also drink potions should leave this off.",
 
@@ -218,6 +221,31 @@
   "EE.Features.WitchsCharm.Spend": "Spend 3 Hope",
   "EE.Features.WitchsCharm.Keep": "Let it fail",
   "EE.Features.WitchsCharm.Spent": "{witch} spends 3 Hope — Witch's Charm. {roller}'s roll succeeds, with Fear.",
+
+  "EE.Features.Hex.Title": "Before the moment passes",
+  "EE.Features.Hex.Intro": "{attacker} made {hurt} mark {marks} Hit Point(s).",
+  "EE.Features.Hex.IntroSelf": "{attacker} made you mark {marks} Hit Point(s).",
+  "EE.Features.Hex.Verdict": "{marks} HP",
+  "EE.Features.Hex.Label": "Hex",
+  "EE.Features.Hex.Hint": "Mark a Stress to Hex {attacker}. Every action and damage roll against it — anyone's, not only yours — gains +{tier}.",
+  "EE.Features.Hex.HintReplace": " This lifts your hex on {previous}.",
+  "EE.Features.Hex.Cast": "Mark a Stress",
+  "EE.Features.Hex.Decline": "Let it pass",
+  "EE.Features.Hex.Modifier": "{witch}'s Hex",
+  "EE.Features.Hex.EffectName": "Hexed by {source}",
+  "EE.Features.Hex.EffectDescription": "<p>Action and damage rolls against this creature gain a bonus equal to the hexing Witch's tier.</p><p><em>Delete this effect when the scene ends, or spend Fear equal to her Spellcast trait to lift it early.</em></p>",
+  "EE.Features.Hex.Announce": "{witch} marks a Stress — Hex. {creature} is Hexed.",
+  "EE.Features.Hex.AnnounceReplaced": "The hex on {previous} is lifted.",
+  "EE.Features.Hex.LiftButton": "Spend {price} Fear to lift the Hex",
+  "EE.Features.Hex.LiftTooltip": "The GM may spend Fear equal to the Witch's Spellcast trait to remove this condition.",
+  "EE.Features.Hex.LiftGone": "That Hex names a creature or a Witch who is no longer here. Nothing was spent.",
+  "EE.Features.Hex.LiftAlready": "{creature} is not Hexed any more. Nothing was spent.",
+  "EE.Features.Hex.LiftNoTrait": "{witch} has no Spellcast trait, so the rule names no price. Delete the effect from the creature to lift the Hex.",
+  "EE.Features.Hex.LiftNoFear": "Lifting this Hex costs {price} Fear, and there is {fear}. Nothing was spent.",
+  "EE.Features.Hex.Lifted": "{price} Fear is spent: {witch}'s hex on {creature} is lifted.",
+
+  "EE.Features.TimeRemaining": "Time remaining",
+  "EE.Features.TimeRemainingSeconds": "{seconds}s",
 
   "EE.Features.AwaitingReaction": "Waiting for {user} to answer a reaction prompt…",
 

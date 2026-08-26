@@ -30,6 +30,7 @@ import { registerHerbalRemedies } from "./daggerheart/herbal-remedies.js";
 import { registerHoldThemOff } from "./daggerheart/hold-them-off.js";
 import { registerTetheredTalisman } from "./daggerheart/tethered-talisman.js";
 import { registerWitchsCharm } from "./daggerheart/witchs-charm.js";
+import { registerHex } from "./daggerheart/hex.js";
 import { registerISeeItComing } from "./daggerheart/i-see-it-coming.js";
 import { registerGmEffects } from "./daggerheart/gm-effects.js";
 import { registerGmActionEffects } from "./daggerheart/gm-action-effects.js";
@@ -180,6 +181,13 @@ Hooks.once("init", async () => {
   // script load — so this must run before anything can be damaged, which `init`
   // guarantees on its own.
   registerTetheredTalisman();
+  // Not a roll window either, and its two halves sit on either side of the one
+  // above: a rule on the shared `applyDamage` wrapper notes who is about to hurt
+  // whom, and `postTakeDamage` then asks whether to hex them — which is *after*
+  // the talisman has had its say, so a hit the talisman reduced to nothing marks
+  // no Hit Points and raises no prompt. Before `registerDamageLanding` for the
+  // same reason as everything else that registers a rule with it.
+  registerHex();
   // The single wrapper behind every rule that fires when damage lands. After the
   // features, so every rule they register is already listed — though the patch
   // itself waits for `setup`, so the order is only tidiness.

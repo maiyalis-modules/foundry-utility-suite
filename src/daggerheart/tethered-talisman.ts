@@ -310,6 +310,7 @@ async function askWitch(witch: AnyObject, holder: AnyObject, marking: number): P
         label: game.i18n.localize("EE.Features.TetheredTalisman.OfferLabel"),
         hint: game.i18n.localize("EE.Features.TetheredTalisman.OfferHint"),
         itemName: String(card?.["name"] ?? LABEL),
+        img: card?.["img"] ? String(card["img"]) : undefined,
         useLabel: game.i18n.localize("EE.Features.TetheredTalisman.Spend"),
         skipLabel: game.i18n.localize("EE.Features.TetheredTalisman.Keep"),
       },
