@@ -287,7 +287,22 @@ const CLASSES: Catalog = {
         },
       ],
     },
-    plain("Wizard"),
+    {
+      id: "wizard",
+      label: "Wizard",
+      groups: [
+        {
+          legend: "EE.Automation.FeaturesLegend",
+          settings: [
+            {
+              key: SETTINGS.notThisTimeReroll,
+              name: "EE.Settings.NotThisTimeReroll.Name",
+              hint: "EE.Settings.NotThisTimeReroll.Hint",
+            },
+          ],
+        },
+      ],
+    },
     fromVoid("Assassin"),
     {
       id: "blood-hunter",

@@ -203,6 +203,19 @@ export const SETTINGS = {
    */
   iSeeItComingEvasion: "iSeeItComingEvasion",
   /**
+   * Master switch for automating **Not This Time** (Wizard, SRD p.25): when an
+   * adversary within Far range rolls an attack or rolls damage, offer the
+   * character 3 Hope to make it throw the dice again — before the chat card is
+   * posted, and before either the hit or the damage reaches anyone. See
+   * `daggerheart/not-this-time.ts`.
+   *
+   * World-scoped and **on** by default, for the same reasons as
+   * {@link SETTINGS.bloodMaledictReroll}: one switch governs both halves of the
+   * card, and both of them raise the prompt on the GM's client and show it on the
+   * character's owner's, so both ends of the table need the module enabled.
+   */
+  notThisTimeReroll: "notThisTimeReroll",
+  /**
    * Master switch for automating **Hold Them Off** (Ranger): after a successful
    * weapon attack, offer to spend 3 Hope and add up to two more adversaries
    * within the attack's range to the roll that already happened — before the

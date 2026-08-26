@@ -11,6 +11,7 @@ import { registerDeckLimitGuard } from "./daggerheart/deck-limit-guard.js";
 import { registerDeckLimitWizard } from "./daggerheart/deck-limit-wizard.js";
 import { registerAdaptability } from "./daggerheart/adaptability.js";
 import { registerAdversaryAttack } from "./daggerheart/adversary-attack.js";
+import { registerAdversaryDamage } from "./daggerheart/adversary-damage.js";
 import { registerAttackOfOpportunity } from "./daggerheart/attack-of-opportunity.js";
 import { registerBloodMaledict } from "./daggerheart/blood-maledict.js";
 import { registerBlightingStrike } from "./daggerheart/blighting-strike.js";
@@ -37,6 +38,7 @@ import { registerISeeItComing } from "./daggerheart/i-see-it-coming.js";
 import { registerGmEffects } from "./daggerheart/gm-effects.js";
 import { registerGmActionEffects } from "./daggerheart/gm-action-effects.js";
 import { registerNotGoodEnough } from "./daggerheart/not-good-enough.js";
+import { registerNotThisTime } from "./daggerheart/not-this-time.js";
 import { registerRangersFocus } from "./daggerheart/rangers-focus.js";
 import { registerReach } from "./daggerheart/reach.js";
 import { reconcileSlayerCards, registerSlayer } from "./daggerheart/slayer.js";
@@ -130,6 +132,11 @@ Hooks.once("init", async () => {
   registerFearless();
   registerBloodMaledict();
   registerISeeItComing();
+  // Registered on the adversary-attack window beside those two, and on the
+  // adversary-damage window below. One card, two moments; the order between it
+  // and Blood Maledict costs nothing, because both stop at the first reroll
+  // anyone asks for and the second declines rather than charging.
+  registerNotThisTime();
   // A registry feature on the same window, plus a card of its own. Registered
   // before the Ranger pair only because it is a domain card, like the two above
   // it — nothing on this window depends on the order between them, since each
@@ -145,10 +152,16 @@ Hooks.once("init", async () => {
   // weapon attack is neither a spellcast nor an adversary's roll, so no other
   // window is looking at it.
   registerHoldThemOff();
-  // The only window on a *damage* roll rather than an attack or a Duality, so
-  // nothing else is looking at what it changes and its place in this list costs
-  // nothing. It has to be registered before `installRollPipeline` all the same.
+  // The first of two windows on a *damage* roll rather than an attack or a
+  // Duality. Nothing else is looking at what it changes, so its place in this
+  // list costs nothing. It has to be registered before `installRollPipeline` all
+  // the same.
   registerNotGoodEnough();
+  // The second, and after it deliberately: that one rerolls the 1s and 2s of a
+  // roll its holder just made, this one throws an adversary's whole roll away.
+  // The two never see the same roll — a character's damage is excluded here —
+  // so the order costs nothing today and reads the right way round regardless.
+  registerAdversaryDamage();
   // Four separate rules on one card, and none of them is a reaction window: it
   // hooks the duality window through the registry, patches two of the system's
   // roll classes, and installs one roll window of its own. Before

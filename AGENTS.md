@@ -574,6 +574,58 @@ loads).
     calls `actor.modifyResource(...)` directly and **awaits** it, which is why
     `payCost` returns `void | Promise<void>` and `applyOffer` is async: a failed
     write aborts the window before the outcome changes, rather than after.
+  - **The `adversaryDamage` window** (`adversary-damage.ts`) — the same shape one
+    stage later: an adversary's *damage* roll, still changeable, and still by
+    somebody who isn't the one who rolled it. Sits at the same seam
+    `not-good-enough.ts` does, which is what makes it work — `DamageRoll.buildPost`
+    builds a `PoolTerm` and `await`s `triggerChatRollFx` **before** its `super`
+    call, so the table has already watched the dice land, with the system's own
+    whisper/blind applied, and yet nothing has been posted or applied. So this is
+    the one window that must **not** call `showDiceEarly`; it would throw the same
+    dice twice.
+    - **It rerolls `config.damage.main`, not the `roll` the pipeline carries** —
+      for a damage roll that object is a shell, and `buildEvaluate` puts the dice
+      that matter on the config. So the window returns nothing to the pipeline and
+      assigns that field in place, which is the system's own idiom (`buildEvaluate`
+      does exactly that when handed a config that already carries damage).
+    - **`resetFormula()` before `reroll()`, always.** `main` carries a *stale*
+      `_formula`: `DHRoll#constructFormula` builds it from the printed damage
+      expression and then pushes the modifiers, the critical bonus and any damage
+      multiplier straight onto `terms` without recompiling the string. `reroll` is
+      `clone().evaluate()` and `clone` reads that string, so rerolling untouched
+      silently drops everything the modifiers added. `DamageRoll` descends from
+      `DHRoll` directly and inherits **neither** of `D20Roll`'s overrides, so both
+      calls reach core's — which also means `reroll`'s `liveRoll` option is not
+      there, and the replacement dice are animated by hand through `showDiceEarly`
+      with `rollVisibility`. Just as well: `D20Roll#reroll`'s `liveRoll` animates
+      to the whole table with no whisper list at all.
+    - **`main` only.** The resource formulas on the same action — a Stress the hit
+      also inflicts, a healing part — are not the damage roll, the same line
+      `not-good-enough.ts` draws for the same reason.
+    - **Three deliberate silences**: a roller that is a `character` or `companion`
+      (their damage is their own, and `notGoodEnough` is the window that looks at
+      it — phrased that way rather than "is an adversary" so an *environment* still
+      opens it), a healing roll, and an unmeasurable range.
+    - **It is the only prompt in the module that prints a roll total**, and the
+      exception is the no-totals rule's own reasoning turned around: whether an
+      attack landed is what a player reacts to, but for damage the number *is* the
+      decision. The other half still holds, so the number is printed only to a user
+      the roll was not hidden from (`canSee`, which asks `rollVisibility` the same
+      question the dice animation asked); otherwise the verdict falls back to the
+      bare word "Damage".
+  - **`adversary-reaction.ts`** holds what the two adversary windows share once
+    there were two of them: `rollActor`, `candidateReactors` and `payCostFor`. The
+    second-consumer extraction, like `damage-marking.ts` — not a base class. The
+    loops stay separate on purpose, because the two differ in the question they
+    ask, in what a reroll rebuilds, and in whether the dice have already been
+    shown, which is most of each file.
+  - **`stillOffered(context, offer)`** re-asks an offer's own three changeable
+    gates — setting, trigger, price — against the context the offers before it have
+    already changed. Both adversary windows run every ticked box through it before
+    charging. The case that needs it: two cards that both force a reroll (Blood
+    Maledict and Not This Time) are two boxes on one prompt, and there is only ever
+    one reroll to have, so the second must not be paid for. Both features also gate
+    their own `when` on `rerollRequested`, which is what `stillOffered` then reads.
 - **Adaptability** (`src/daggerheart/adaptability.ts`) — the Human ancestry's
   (SRD p.30) "When you fail a roll that utilized one of your Experiences, you can
   mark a Stress to reroll." `Compendium.daggerheart.ancestries.Item.BNofV1UC4ZbdFTkb`,
@@ -2076,6 +2128,46 @@ loads).
     hand; the colour does it instead, and the sentence is free to ask the
     question. There is no hint under the box for the same reason — the label is
     one line, and the notification after a tick says where the preference went.
+- **Not This Time** (`src/daggerheart/not-this-time.ts`) — the Wizard's (SRD
+  p.25) "Spend 3 Hope to force an adversary within Far range to reroll an attack
+  or damage roll." `Compendium.daggerheart.classes.Item.h3VE0jhcM5xHKBs4`, a
+  `feature` Item whose one action ("Spend Hope", type `effect`, range `far`)
+  charges the 3 Hope and has no effects — so pressing it takes the Hope and
+  rerolls nothing, and the GM has to remember to throw the dice again by hand,
+  after the card has posted. That card is left alone as the manual route, exactly
+  as Blood Maledict's is. World setting `notThisTimeReroll`, **on** by default,
+  filed under **Classes → Wizard**.
+  - **Two windows, one rule.** "An attack or damage roll" is two seams, because
+    the system rolls and posts them separately: `adversaryAttack` for the d20 and
+    `adversaryDamage` for the dice that follow it. Two `registerFeature` calls
+    sharing an id, a price, a setting, a card and a `when` — nothing has to decide
+    which the player meant, because the two arrive at different moments and each
+    offers itself when it is the one on the table. The only difference between the
+    registrations is the hint, and it has to be: "reroll this attack" and "reroll
+    this damage" are different decisions.
+  - **The reroll is plain.** The card says "reroll", not "reroll with
+    disadvantage", so the attack half calls `forceReroll` rather than Blood
+    Maledict's `forceRerollWithDisadvantage`, and `rerollAttack` leaves
+    `config.roll.advantage` exactly as it found it — whatever the adversary
+    already had, it keeps. Forcing a reroll is not the same as making the roll
+    worse, and this card only does the first. That is what the window's
+    `RerollMode` exists for; `rerollRequested` became a getter over `rerollMode`
+    so one piece of state answers both "has anyone?" and "how?".
+  - **Four readings.** "Within Far range" is *the adversary within Far range of
+    you* — the standard reaction shape, and the only parse that is checkable,
+    since a roll does not record its own band (same choice as Blood Maledict's
+    "within Close"). "An adversary" is enforced in the feature, not the window,
+    because it is this card's wording — an environment is not what it reacts to,
+    unlike I See It Coming's "an attack". **You need not be the target**: the rule
+    is conditioned on an adversary rolling, which is most of what makes it worth 3
+    Hope. And the attack half still only opens on a *hit*, because the window
+    does — strictly the card would let you reroll a miss, nobody would, and the
+    reading errs the safe way.
+  - **It declines once a reroll is already asked for.** A character can hold this
+    and Blood Maledict at once; on a Close-range hit both would be offered, and
+    both would be charged for one reroll. Both gate on `rerollRequested`, and
+    `stillOffered` is what makes that gate hold after the prompt as well as before
+    it.
 - **Attack of Opportunity** (`src/daggerheart/attack-of-opportunity.ts`) — the
   Warrior's (SRD p.23) "If an adversary within Melee range attempts to leave that
   range, make a reaction roll using a trait of your choice against their
@@ -2624,7 +2716,8 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Crimson Rite and Hybrid Form under Blood Hunter; Hold Them Off, Ranger's
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
-    Tracker under Sage, Not Good Enough under Blade, Attack of Opportunity and
+    Tracker under Sage, Not Good Enough under Blade, Not This Time under Wizard,
+    Attack of Opportunity and
     Slayer under Warrior, Commune, Witch's Charm, Hex, Herbal Remedies and
     Tethered Talisman under Witch). A subclass
     has no home of

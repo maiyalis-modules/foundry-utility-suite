@@ -32,6 +32,13 @@
  * follows from it. `RollField.order` is 10 and `TargetField.order` is 20, so the
  * whole action workflow after the roll reads whatever this window leaves behind.
  *
+ * ## What lives next door
+ *
+ * The parts of this window that are about *who may react* rather than about an
+ * attack — enumerating the characters on the scene, finding the roller, charging
+ * a reactor — moved to `adversary-reaction.ts` when `adversary-damage.ts` became
+ * the second window built the same way.
+ *
  * ## Two deliberate silences
  *
  * The window declines to act, rather than guessing, when:
@@ -44,12 +51,13 @@
  *   because nothing in the config knows whether it hit.
  */
 import { LOG_PREFIX } from "../constants.js";
+import { candidateReactors, payCostFor, rollActor } from "./adversary-reaction.js";
 import { askUser, responderFor, toPromptOffers } from "./feature-ask.js";
 import type { PromptHeadline, PromptParty } from "./feature-prompt.js";
 import {
   applyOffer,
   offersFor,
-  resourceUpdatesFor,
+  stillOffered,
   type FeatureContextBase,
   type FeatureCost,
 } from "./feature-registry.js";
@@ -65,6 +73,16 @@ const ATTACK = "attack";
 
 /** `D20Roll.ADV_MODE.DISADVANTAGE`. On a d20 roll this means `2d20kl`. */
 const DISADVANTAGE = -1;
+
+/**
+ * How a card wants the attack rolled again.
+ *
+ * `"normal"` means *as it was rolled* rather than at a flat d20: whatever
+ * advantage or disadvantage the adversary already had is the adversary's, and a
+ * card that says only "reroll" does not take it away. So that mode leaves
+ * `config.roll.advantage` exactly as it found it.
+ */
+export type RerollMode = "normal" | "disadvantage";
 
 /** Context handed to every feature registered on this window. */
 export interface AdversaryAttackContext extends FeatureContextBase {
@@ -101,8 +119,24 @@ export interface AdversaryAttackContext extends FeatureContextBase {
    * than pay for an effect that cannot land.
    */
   evasionDecides: boolean;
-  /** Set once a feature has asked for the reroll; a second one would be wasted. */
-  rerollRequested: boolean;
+  /**
+   * Set once a feature has asked for the reroll; a second one would be wasted.
+   *
+   * Two cards can both force a reroll — Blood Maledict and Not This Time — so
+   * every feature that does gates its `when` on this being false, and the window
+   * re-checks each choice against it before charging (see {@link stillOffered}).
+   * The first request wins; there is only ever one reroll to have.
+   *
+   * A getter over {@link rerollMode} rather than a second flag beside it: one
+   * piece of state answers both "has anyone?" and "how?", and the two can never
+   * drift apart.
+   */
+  readonly rerollRequested: boolean;
+  /**
+   * How that reroll was asked for, or null while nobody has. The window's own
+   * record; features ask {@link rerollRequested} instead.
+   */
+  rerollMode: RerollMode | null;
   /**
    * Is the attacker inside `band` of this actor? False when the thresholds can't
    * be read, which keeps the window's "don't guess about range" promise.
@@ -114,6 +148,11 @@ export interface AdversaryAttackContext extends FeatureContextBase {
    * Melee range" declines rather than firing on a distance nobody established.
    */
   beyond(band: RangeBand): boolean;
+  /**
+   * Ask for the attack to be rolled again, as it was rolled — no advantage taken
+   * away and none given.
+   */
+  forceReroll(): void;
   /** Ask for the attack to be rolled again at disadvantage. */
   forceRerollWithDisadvantage(): void;
   /**
@@ -126,41 +165,6 @@ export interface AdversaryAttackContext extends FeatureContextBase {
 /** Is `value` a difficulty actually set, as opposed to null/undefined/absent? */
 function isFixedNumber(value: unknown): boolean {
   return typeof value === "number" && Number.isFinite(value);
-}
-
-/** The actor that made the roll, or null when the roll has no owner. */
-function rollActor(roll: AnyObject, config: AnyObject): AnyObject | null {
-  const parent = roll["data"]?.["parent"];
-  if (parent) return parent as AnyObject;
-
-  const uuid = config["source"]?.["actor"];
-  return uuid ? fromUuidSync(String(uuid)) : null;
-}
-
-/**
- * Every player character with a token on this scene, other than the attacker.
- *
- * Drawn from the canvas rather than from `game.actors` because a character has to
- * be *present* to react, and because the distance check needs a token anyway.
- * Sorted by name so that when two characters could both react, the order they are
- * asked in is the same on every client and from one roll to the next.
- */
-function candidateReactors(attacker: AnyObject): AnyObject[] {
-  const seen = new Set<string>();
-  const actors: AnyObject[] = [];
-
-  for (const token of canvas.tokens?.placeables ?? []) {
-    const actor = token.actor;
-    if (!actor || actor["type"] !== "character") continue;
-
-    const uuid = String(actor["uuid"] ?? "");
-    if (!uuid || uuid === attacker["uuid"] || seen.has(uuid)) continue;
-
-    seen.add(uuid);
-    actors.push(actor);
-  }
-
-  return actors.sort((a, b) => String(a["name"] ?? "").localeCompare(String(b["name"] ?? "")));
 }
 
 /** Build the context for one potential reactor. */
@@ -200,7 +204,11 @@ function buildContext(
       mine.length > 0 &&
       !isFixedNumber(config["roll"]?.["difficulty"]) &&
       mine.every((target) => !isFixedNumber(target["difficulty"])),
-    rerollRequested: false,
+    rerollMode: null,
+
+    get rerollRequested(): boolean {
+      return this.rerollMode !== null;
+    },
 
     within(band: RangeBand): boolean {
       return withinBand(distance, band) === true;
@@ -210,8 +218,17 @@ function buildContext(
       return withinBand(distance, band) === false;
     },
 
+    forceReroll(): void {
+      this.rerollMode ??= "normal";
+    },
+
     forceRerollWithDisadvantage(): void {
-      this.rerollRequested = true;
+      // `??=`, so a card that only asks for a reroll cannot quietly downgrade one
+      // already asked for at disadvantage, or the other way round. In practice
+      // the second request never arrives — every reroll feature declines once
+      // `rerollRequested` is true — and this is what makes that belt and braces
+      // rather than the only thing holding it up.
+      this.rerollMode ??= "disadvantage";
     },
 
     raiseEvasion(amount: number): void {
@@ -245,24 +262,21 @@ function buildContext(
       this.isHitTarget = mine.some((target) => target["hit"] === true);
     },
 
-    async payCost(costs: readonly FeatureCost[]): Promise<void> {
-      if (costs.length === 0) return;
-
-      // Not `config.resourceUpdates` — that map belongs to the *attacker*, and
-      // folding a player's Hope into it would charge the adversary. Awaited so
-      // that a failed write (a client without permission on this actor) aborts
-      // the window before the outcome changes, rather than after.
-      await actor["modifyResource"]?.(resourceUpdatesFor(actor, costs));
+    payCost(costs: readonly FeatureCost[]): Promise<void> {
+      return payCostFor(actor, costs);
     },
   };
 }
 
 /**
- * Build a fresh roll of the same kind at disadvantage and evaluate it.
+ * Build a fresh roll of the same kind and evaluate it, at `mode`.
  *
  * Rebuilding rather than re-rolling the existing dice is what makes disadvantage
  * work: on a d20 roll it is not an extra die to subtract but a second d20 with
- * `kl`, so the formula itself has to change. Feeding the evaluated formula back
+ * `kl`, so the formula itself has to change. A `"normal"` reroll goes the same
+ * way for a different reason — `advantage` is left untouched, so whatever the
+ * adversary already had it keeps, and the rebuild is simply how this window
+ * throws a d20 roll again at all. Feeding the evaluated formula back
  * through the constructor is safe because `D20Roll.createBaseDice` throws away
  * everything except the leading die, and `configureModifiers` then re-derives the
  * bonuses from `config.roll.baseModifiers` and the roll's active effects — so the
@@ -275,10 +289,11 @@ function buildContext(
  * Returns the new roll, or null if the system's shape has moved and the pipeline
  * should post the original untouched.
  */
-async function rerollWithDisadvantage(
+async function rerollAttack(
   roll: AnyObject,
   config: AnyObject,
   message: AnyObject,
+  mode: RerollMode,
 ): Promise<AnyObject | null> {
   const rollClass = roll["constructor"] as AnyObject | undefined;
   if (
@@ -293,7 +308,7 @@ async function rerollWithDisadvantage(
   // replacement's have never been seen and must animate normally.
   clearEarlyDice(config);
 
-  config["roll"]["advantage"] = DISADVANTAGE;
+  if (mode === "disadvantage") config["roll"]["advantage"] = DISADVANTAGE;
 
   const rerolled = rollClass["createRollInstance"](config) as AnyObject;
   // Re-runs the whole evaluation, so `config.roll.total`, `config.roll.success`
@@ -426,8 +441,18 @@ async function runAdversaryAttackWindow(
 
       // Re-checked against the offers this client built, in priority order — the
       // answer arrived over a socket and is treated as a selection, not a command.
+      // `stillOffered` re-asks each one's own question against the context the
+      // ones before it have already changed: a player holding two cards that both
+      // force a reroll can tick both, and only the first is a reroll to have.
       for (const offer of optional) {
-        if (chosen.has(offer.feature.id)) await applyOffer(context, offer);
+        if (!chosen.has(offer.feature.id)) continue;
+        if (!stillOffered(context, offer)) {
+          console.debug(
+            `${LOG_PREFIX} Adversary attack: "${offer.feature.id}" no longer applies; not charged.`,
+          );
+          continue;
+        }
+        await applyOffer(context, offer);
       }
     }
 
@@ -447,8 +472,8 @@ async function runAdversaryAttackWindow(
     }
   }
 
-  if (!accepted) return;
-  return (await rerollWithDisadvantage(roll, config, message)) ?? undefined;
+  if (!accepted?.rerollMode) return;
+  return (await rerollAttack(roll, config, message, accepted.rerollMode)) ?? undefined;
 }
 
 /**

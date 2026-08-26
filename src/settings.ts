@@ -267,6 +267,18 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // World-scoped for the reason above and one of its own: a single switch covers
+  // both halves of the card, so a per-client answer could leave the attack reroll
+  // offered and the damage reroll not.
+  game.settings.register(MODULE_ID, SETTINGS.notThisTimeReroll, {
+    name: "EE.Settings.NotThisTimeReroll.Name",
+    hint: "EE.Settings.NotThisTimeReroll.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   // World-scoped like the others, and for a further reason: this one decides
   // whether an ActiveEffect gets written to a sheet, and a per-client answer
   // would let one player's rite exist and another's not. Read at activation and

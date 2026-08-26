@@ -57,7 +57,15 @@ export function registerBloodMaledict(): void {
     // is the printed rule's own two conditions. `attacker.type` is checked here
     // rather than in the window because "adversary" is this card's wording — an
     // environment making an attack roll is not what it reacts to.
-    when: (context) => context.attacker["type"] === "adversary" && context.within("close"),
+    //
+    // The third condition is not the card's. Not This Time forces a reroll of the
+    // same attack for the same 3 Hope, and a character holding both would be
+    // offered two boxes buying one thing; declining once a reroll has been asked
+    // for is what stops the second box being charged for.
+    when: (context) =>
+      !context.rerollRequested &&
+      context.attacker["type"] === "adversary" &&
+      context.within("close"),
 
     apply: (context) => context.forceRerollWithDisadvantage(),
   });

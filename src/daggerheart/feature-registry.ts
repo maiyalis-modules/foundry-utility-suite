@@ -33,7 +33,7 @@ import { FLAGS, LOG_PREFIX, MODULE_ID } from "../constants.js";
  * of the system's roll/action pipeline; new stages get added here as they are
  * opened up, and a feature naming an unopened window simply never fires.
  */
-export type FeatureWindow = "dualityOutcome" | "adversaryAttack";
+export type FeatureWindow = "dualityOutcome" | "adversaryAttack" | "adversaryDamage";
 
 /**
  * A resource price, in the same shape the system's own `CostField` produces.
@@ -320,6 +320,38 @@ export function offersFor<C extends FeatureContextBase>(
   }
 
   return offers.sort((a, b) => a.feature.priority - b.feature.priority);
+}
+
+/**
+ * Is this offer *still* an offer?
+ *
+ * {@link offersFor} answers the same four questions, but it answers them before
+ * anything has been applied — and a window that applies several offers in a row
+ * hands each one a context the previous ones may have changed. The adversary
+ * windows are where this bites: two features that both force a reroll are two
+ * boxes on one prompt, and a player who ticks both would otherwise be charged
+ * twice for the single reroll the first one already asked for.
+ *
+ * Re-checks the three gates that can *change* — the setting, the trigger, and
+ * the price — and not the granting Item, which cannot have left the sheet
+ * between two lines of the same loop. A throw disqualifies the offer, on the
+ * same reasoning as {@link offersFor}: a broken predicate must not spend a
+ * player's resources.
+ */
+export function stillOffered<C extends FeatureContextBase>(
+  context: C,
+  offer: FeatureOffer<C>,
+): boolean {
+  try {
+    return (
+      offer.feature.enabled() &&
+      offer.feature.when(context, offer.item) &&
+      canAfford(context.actor, offer.feature.cost ?? [])
+    );
+  } catch (error) {
+    console.warn(`${LOG_PREFIX} Feature "${offer.feature.id}" failed while being re-checked.`, error);
+    return false;
+  }
 }
 
 /**
