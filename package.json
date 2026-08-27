@@ -1,6 +1,6 @@
 {
   "name": "eryndor-essentials",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Maiyalis: Utility Suite — quality-of-life tools for the Eryndor campaign in FoundryVTT.",
   "type": "module",
   "private": true,

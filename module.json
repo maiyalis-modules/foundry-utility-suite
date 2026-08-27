@@ -2,7 +2,7 @@
   "id": "eryndor-essentials",
   "title": "Maiyalis: Utility Suite",
   "description": "Essential quality-of-life tools for the Eryndor campaign in Foundry VTT.",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "authors": [
     {
       "name": "Brenton",
@@ -39,5 +39,5 @@
   "socket": true,
   "url": "https://github.com/maiyalis-modules/foundry-utility-suite",
   "manifest": "https://github.com/maiyalis-modules/foundry-utility-suite/releases/latest/download/module.json",
-  "download": "https://github.com/maiyalis-modules/foundry-utility-suite/releases/download/v1.0.0/module.zip"
+  "download": "https://github.com/maiyalis-modules/foundry-utility-suite/releases/download/v1.1.0/module.zip"
 }
