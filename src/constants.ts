@@ -320,6 +320,25 @@ export const SETTINGS = {
    */
   slumberFearGuard: "slumberFearGuard",
   /**
+   * Master switch for applying the damage of an action that has **no attack
+   * roll** to the targets it was aimed at, which the system rolls and posts but
+   * never applies. See `daggerheart/damage-landing.ts`.
+   *
+   * `DamageField.applyDamage` picks its targets with
+   * `config.targets.filter(t => t.hitResult?.success)` — a filter that assumes a
+   * roll happened. An action with none gives its targets no `hitResult`, the
+   * list empties, and the system returns before applying, so the damage sits on
+   * the chat card until somebody presses *Deal Damage*. There is no miss to
+   * respect: the filter exists to skip targets an attack failed to hit, and an
+   * action that never rolled cannot have failed to hit.
+   *
+   * World-scoped and **on** by default, and the system's own apply-automation
+   * switch still gates it — this decides *who* is applied to, never *whether*.
+   * Switching it off restores the press-the-button behaviour exactly. Nothing
+   * with an attack roll is touched either way, misses included.
+   */
+  noRollDamageApply: "noRollDamageApply",
+  /**
    * Master switch for the Beastbound **Companion** card: it grows two buttons —
    * the companion's attack, and a plain action roll — and both are made as the
    * ranger's own Spellcast Roll, with the companion's Experiences on offer for a

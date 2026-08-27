@@ -31,8 +31,15 @@
  * when the system moves, and leave nowhere that answers "what happens when damage
  * lands". Rules run in registration order; one that throws is logged and skipped,
  * because the damage has to land either way.
+ *
+ * ## The one rule that lives in the wrapper itself
+ *
+ * Everything above is a callback reacting to the call. {@link unrolledTargets}
+ * is different in kind: it changes an *argument* before the system sees it,
+ * which no registered rule can do, and it is why this file reads a setting at
+ * all. Its own note says what it is for.
  */
-import { LOG_PREFIX } from "../constants.js";
+import { LOG_PREFIX, MODULE_ID, SETTINGS } from "../constants.js";
 
 /**
  * One rule. `applying` is false when the system is about to no-op — apply
@@ -105,6 +112,71 @@ export function registerDamageLanding(): void {
   Hooks.once("setup", patchApplyDamage);
 }
 
+/**
+ * Who an action with no attack roll should apply its damage to.
+ *
+ * `DamageField.applyDamage` opens by working out who to hit:
+ *
+ * ```js
+ * targets ??= config.targets.filter(target => target.hitResult?.success);
+ * if (!config.damage || !targets?.length || …) return;
+ * ```
+ *
+ * That filter assumes an attack roll happened. A `damage` action has none —
+ * "shoot magical projectiles that strike a target of your choice" is not rolled
+ * against anything — so its targets carry no `hitResult`, the list empties, and
+ * the system returns before applying anything. The damage is rolled and posted
+ * and then nothing reaches anybody until a human presses *Deal Damage*.
+ *
+ * **There is no miss to respect**, and that is the whole argument. The filter
+ * exists to skip targets an attack failed to hit; an action that never rolled
+ * cannot have failed to hit. So when nothing measured a hit at all, the chosen
+ * targets are passed through and the system applies to them.
+ *
+ * Four things keep it narrow:
+ *
+ * - **An explicit `targets` argument is never overridden.** The chat card's
+ *   *Deal Damage* button passes `system.currentHitTargets` along with `force`,
+ *   so that route is untouched and cannot double-apply.
+ * - **`config.hasRoll` decides.** Anything with an attack roll keeps the
+ *   system's filter, misses included.
+ * - **`force` is not passed on.** The system's own apply-automation switch still
+ *   gates the call, so a table that applies damage by hand keeps doing so.
+ *
+ * Healing rides the same method and is deliberately included: a healing action
+ * with no roll has exactly the same gap, for exactly the same reason.
+ *
+ * **A `hitResult` is not evidence of a hit**, and an earlier version of this that
+ * backed out when it saw one never fired at all. `TargetField.execute` runs at
+ * order 20 — after the damage roll, before this — and stamps every target
+ * unconditionally:
+ *
+ * ```js
+ * const hitSuccessfull = (!config.roll || !toHitNumber) ? false : (…);
+ * target.hitResult = { success: hitSuccessfull };
+ * ```
+ *
+ * With no roll that is `{ success: false }` on everyone, so the field is always
+ * present and always false, and `config.hasRoll` is the only honest question.
+ *
+ * The system agrees, in the one place it already had to decide this. The chat
+ * card's *Deal Damage* button applies to `currentHitTargets`, which opens
+ * `if (!this.hasRoll || …) return this._getCurrentTargets();` — every target,
+ * unfiltered, precisely because there was no roll to filter on. That is why the
+ * button has always worked on these cards while automation did nothing. This
+ * puts the same rule on the automated path rather than inventing one.
+ */
+function unrolledTargets(config: AnyObject, targets: AnyObject[] | null): AnyObject[] | null {
+  if (targets !== null) return targets;
+  if (game.settings.get(MODULE_ID, SETTINGS.noRollDamageApply) !== true) return targets;
+  if (config["hasRoll"]) return targets;
+
+  const chosen = config["targets"];
+  if (!Array.isArray(chosen) || chosen.length === 0) return targets;
+
+  return chosen as AnyObject[];
+}
+
 function patchApplyDamage(): void {
   const damageField = game.system?.api?.fields?.ActionFields?.DamageField as AnyObject | undefined;
   const original = damageField?.["applyDamage"];
@@ -124,9 +196,17 @@ function patchApplyDamage(): void {
   ): Promise<unknown> {
     const applying = force === true || damageField!["getApplyAutomation"]?.() === true;
 
-    await run("before", config, targets, applying);
-    const result = await original.call(this, config, targets, force);
-    await run("after", config, targets, applying);
+    let chosen = targets;
+    try {
+      chosen = unrolledTargets(config, targets);
+    } catch (error) {
+      // The damage lands either way; a broken setting read must not eat it.
+      console.warn(`${LOG_PREFIX} Damage landing: could not choose the targets.`, error);
+    }
+
+    await run("before", config, chosen, applying);
+    const result = await original.call(this, config, chosen, force);
+    await run("after", config, chosen, applying);
 
     return result;
   };

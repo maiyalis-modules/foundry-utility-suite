@@ -65,7 +65,11 @@ export class DaggerheartAutomationConfig extends ConfigWindow {
     footer: { template: TEMPLATES.configFooter },
   };
 
-  protected override settingKeys = [SETTINGS.reachMeleeAsVeryClose, ...catalogSettingKeys()];
+  protected override settingKeys = [
+    SETTINGS.reachMeleeAsVeryClose,
+    SETTINGS.noRollDamageApply,
+    ...catalogSettingKeys(),
+  ];
 
   /**
    * Which entry each catalog tab is showing, by catalog id. Kept on the instance
@@ -81,6 +85,7 @@ export class DaggerheartAutomationConfig extends ConfigWindow {
       ...context,
       voidActive: game.modules.get(VOID_MODULE_ID)?.active === true,
       reach: DaggerheartAutomationConfig.flag(SETTINGS.reachMeleeAsVeryClose),
+      noRollDamage: DaggerheartAutomationConfig.flag(SETTINGS.noRollDamageApply),
     };
   }
 

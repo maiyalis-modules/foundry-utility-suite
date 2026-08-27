@@ -20,4 +20,17 @@
     </div>
   </fieldset>
 
+  <fieldset>
+    <legend>{{localize "EE.Automation.DamageLegend"}}</legend>
+
+    <div class="form-group">
+      <label for="ee-no-roll-damage">{{localize "EE.Settings.NoRollDamageApply.Name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" id="ee-no-roll-damage" name="noRollDamageApply"
+               {{#if noRollDamage}}checked{{/if}}>
+      </div>
+      <p class="hint">{{localize "EE.Settings.NoRollDamageApply.Hint"}}</p>
+    </div>
+  </fieldset>
+
 </section>

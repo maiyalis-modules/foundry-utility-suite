@@ -421,6 +421,18 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // World-scoped because it decides whether a hit lands on the GM's adversary,
+  // which both sides of the table have to agree on. Read at the moment damage is
+  // applied, so a change takes effect on the very next one.
+  game.settings.register(MODULE_ID, SETTINGS.noRollDamageApply, {
+    name: "EE.Settings.NoRollDamageApply.Name",
+    hint: "EE.Settings.NoRollDamageApply.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   // World-scoped for a reason beyond consistency here too: the actions this adds
   // are built during data preparation on every client that prepares the card, and
   // the range origin they declare is read on whichever client rolled. A per-user

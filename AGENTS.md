@@ -2620,6 +2620,37 @@ loads).
     system has applied.
   - Both get `applying`, computed from the system's own answer
     (`force || getApplyAutomation()`) rather than a copy of the rule.
+  - **`unrolledTargets` is the one rule that lives in the wrapper itself**, and
+    the reason this file reads a setting at all: it changes an *argument* before
+    the system sees it, which no registered callback can do. World setting
+    `noRollDamageApply`, **on** by default, in the **General** tab under a
+    **Damage** legend.
+    - `applyDamage` opens with
+      `targets ??= config.targets.filter(t => t.hitResult?.success)`, a filter
+      that assumes an attack roll happened. A `damage` action has none, so its
+      targets carry no `hitResult`, the list empties, and the system returns
+      before applying — the damage is rolled and posted and then reaches nobody
+      until a human presses *Deal Damage*. Hit at the table on Arcane Barrage,
+      but it is every no-roll damage action in the system.
+    - **There is no miss to respect**, which is the whole argument: the filter
+      exists to skip targets an attack failed to hit, and an action that never
+      rolled cannot have failed to hit.
+    - Three guards keep it narrow — an explicit `targets` argument is never
+      overridden (the chat card's button passes `system.currentHitTargets` with
+      `force`, so it cannot double-apply); `config.hasRoll` backs out, misses
+      included; and `force` is not passed on, so the system's apply-automation
+      switch still decides *whether* while this decides only *who*.
+    - **Do not test `target.hitResult`** — a fourth guard that did was what made
+      the first version a no-op. `TargetField.execute` (order 20, after the
+      damage roll and before this) stamps `hitResult = { success: … }` on every
+      target unconditionally, and with no roll that is `false` for all of them.
+      The field is always there; only `config.hasRoll` says anything.
+    - **The system's own precedent** is `ChatMessage#currentHitTargets`, which
+      opens `if (!this.hasRoll || …) return this._getCurrentTargets()` — every
+      target, unfiltered, because there was no roll to filter on. That is why
+      *Deal Damage* always worked on these cards while automation did nothing.
+    - Healing rides the same method and is deliberately included: a healing
+      action with no roll has the same gap for the same reason.
   - **`withoutApplyButtons()`** (in `roll-pipeline.ts`) keeps the system's *Deal
     Damage* / *Apply Healing* pair off a plain roll card. The system assigns
     `globalThis.Roll = BaseRoll`, so **every** `new Roll()` in the world renders
