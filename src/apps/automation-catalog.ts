@@ -471,6 +471,11 @@ const DOMAINS: Catalog = {
               name: "EE.Settings.SlumberFearGuard.Name",
               hint: "EE.Settings.SlumberFearGuard.Hint",
             },
+            {
+              key: SETTINGS.telepathyLink,
+              name: "EE.Settings.TelepathyLink.Name",
+              hint: "EE.Settings.TelepathyLink.Hint",
+            },
           ],
         },
       ],

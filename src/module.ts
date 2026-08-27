@@ -45,6 +45,7 @@ import { registerRangersFocus } from "./daggerheart/rangers-focus.js";
 import { registerReach } from "./daggerheart/reach.js";
 import { reconcileSlayerCards, registerSlayer } from "./daggerheart/slayer.js";
 import { registerSlumber } from "./daggerheart/slumber.js";
+import { registerTelepathy } from "./daggerheart/telepathy.js";
 import { registerStrangePatterns } from "./daggerheart/strange-patterns.js";
 import { installRollPipeline } from "./daggerheart/roll-pipeline.js";
 import { registerViciousEntangle } from "./daggerheart/vicious-entangle.js";
@@ -203,6 +204,7 @@ Hooks.once("init", async () => {
   // condition one card applies, on `preDeleteActiveEffect`. Nothing about a roll
   // reaches it, so its place in this list costs nothing.
   registerSlumber();
+  registerTelepathy();
   // Not a roll window either, and not a card that can be pressed at all: a
   // passive rule that raises a consumable's healing formula before it is rolled.
   // It patches one of the system's action fields directly, and waits for `setup`

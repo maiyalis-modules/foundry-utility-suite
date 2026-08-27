@@ -320,6 +320,26 @@ export const SETTINGS = {
    */
   slumberFearGuard: "slumberFearGuard",
   /**
+   * Master switch for the two endings of **Telepathy** (Codex domain, the *Book
+   * of Illiat*): "this connection lasts until your next rest or you cast
+   * Telepathy again". See `daggerheart/telepathy.ts`.
+   *
+   * Neither clause is enforceable by the card. The effect it applies lives on
+   * the *target*, and the system's `expireActiveEffects` only ever sweeps the
+   * effects of the actor who rested — so the caster's rest, which is the rest
+   * the rule names, never sees it. This records the open line on the caster, so
+   * that their rest has something of its own to expire, and closes the far end
+   * when it does.
+   *
+   * World-scoped and **on** by default. The record is written by the GM's client
+   * onto actors a player may not own, which makes it a table-wide fact rather
+   * than one client's preference. Switching it off leaves the card exactly as
+   * the SRD ships it — the Hope, the targeting and the effect landing are the
+   * system's own and are untouched either way — and the connection is tracked on
+   * paper, which is what the table does today.
+   */
+  telepathyLink: "telepathyLink",
+  /**
    * Master switch for applying the damage of an action that has **no attack
    * roll** to the targets it was aimed at, which the system rolls and posts but
    * never applies. See `daggerheart/damage-landing.ts`.
@@ -723,6 +743,23 @@ export const FLAGS = {
    * Purely a label: the authoritative record is always the ranger's own effect.
    */
   rangersFocusTarget: "rangersFocusTarget",
+  /**
+   * The open **Telepathy** line, on the ActiveEffect this module puts on the
+   * *caster*: `{ targetUuid, targetName, effectId }`, naming the creature on the
+   * other end and the copy of the card's effect sitting on them.
+   *
+   * On the caster for the same reason as {@link FLAGS.rangersFocus}: one caster
+   * to one creature, and the caster is the only end that is reliably writable,
+   * present and singular. It is also the only end a rest can reach — see
+   * {@link SETTINGS.telepathyLink}.
+   *
+   * The copy on the target is deliberately left unstamped. It is created by the
+   * system on whichever client cast the spell, which is usually a player with no
+   * write access to the creature; its `origin` already leads back to the caster,
+   * and this flag already names it, so a second record would be a permission
+   * problem bought for nothing.
+   */
+  telepathy: "telepathy",
   /**
    * The Blighting Strike mark on a creature the strike hit: `{ sourceUuid }`,
    * naming the caster.

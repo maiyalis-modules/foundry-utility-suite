@@ -412,6 +412,19 @@ export function registerSettings(): void {
   // would make the same right-click do two different things depending on which
   // GM pressed it. Read at the moment of the delete, so a change takes effect on
   // the very next one.
+  // World-scoped because the record is written by the GM's client onto actors a
+  // player may not own, so a per-user version would mean the same cast tracked
+  // itself on one screen and not another. Read at the moment a connection opens
+  // or closes, so a change takes effect on the very next cast.
+  game.settings.register(MODULE_ID, SETTINGS.telepathyLink, {
+    name: "EE.Settings.TelepathyLink.Name",
+    hint: "EE.Settings.TelepathyLink.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
   game.settings.register(MODULE_ID, SETTINGS.slumberFearGuard, {
     name: "EE.Settings.SlumberFearGuard.Name",
     hint: "EE.Settings.SlumberFearGuard.Hint",

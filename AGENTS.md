@@ -1524,6 +1524,62 @@ loads).
     of Armor?) and would delete a condition the table still considers live if
     guessed at — *Remove anyway* is what covers it meanwhile; and **"on their
     turn"**, which Daggerheart gives nothing to check against.
+- **Telepathy** (`src/daggerheart/telepathy.ts`) — the third ability on the same
+  *Book of Illiat*: "Spend a Hope to open a line of mental communication with one
+  target you can see. This connection lasts until your next rest or you cast
+  Telepathy again." World setting `telepathyLink`, **on** by default, filed under
+  **Domains → Codex** beside Slumber.
+  - **The whole front half already works and is not touched.** An `effect` action:
+    one Hope, `target.type: "any"` / `amount: 1`, no roll, one embedded
+    *Telepathy* ActiveEffect (`zAEaETYSOE2fmcyB`). Targeting needs no help — the
+    action's `range` is blank, and `withinActionRange` returns `null` for blank,
+    so nothing narrows the choice below "a token you can target". The effect
+    lands on its own because `EffectsField.execute` filters with
+    `!config.hasRoll || t.hitResult?.success` — **the effects path already knows
+    the "no roll, so nothing to filter on" rule the damage path had to be taught**
+    (see *Damage landing*).
+  - **`duration.type: "shortRest"` on the applied effect is not enough, and it
+    looks like it should be.** The downtime application calls
+    `expireActiveEffects(this.actor, …)` — it only ever sweeps **the actor who
+    rested**. The Telepathy effect is on the *target*, so the caster's rest, which
+    is the rest the rule names, never sees it; and the target is usually an
+    adversary who never rests at all.
+  - **So the record goes on the caster**, as an ActiveEffect carrying
+    `flags.eryndor-essentials.telepathy = { targetUuid, targetName, effectId }`
+    and *the same duration read off the card*. The system's own sweep expires it
+    on exactly the rests the system counts as rests, and this file follows that
+    deletion across to the target. **Do not re-implement rest detection** — there
+    is no rest hook, `expireActiveEffects` is module-scoped in the bundle and
+    unreachable, and delegating is the only version that stays correct when the
+    system changes its mind.
+  - **The applied copy is left completely unstamped.** It is created by the system
+    on whichever client cast the spell, usually a player with no write access to
+    the target; its `origin` already leads back to the caster's card effect, and
+    the companion already names it by id, so a second record would buy a
+    permission problem for nothing. Same reasoning as Ranger's Focus, one step
+    further: even the cosmetic mark is skipped, because the system's own effect
+    *is* the mark.
+  - **Recognition adds one test in front of Slumber's four**: a companion is named
+    *Telepathy* too and would otherwise match itself, so `linkOf(effect)` bails
+    first. Then Actor-parented, `featureId`, origin ending
+    `.ActiveEffect.zAEaETYSOE2fmcyB`, name.
+  - **Three ways in, one way out.** Rest (the system deletes the companion),
+    recast (`beginLink` calls `endLink` first, wherever the old line was), and a
+    hand deletion from either sheet. Every deletion this file issues carries
+    `eeTelepathyHandled: true`, which is how the other end's hook knows not to
+    chase it back — the same trick as `eeSlumberApproved`, for the opposite
+    reason (that one lets a delete *through*, this one stops a *cascade*).
+  - The delete hook re-checks `linkOf(companion)?.effectId === effect.id` before
+    clearing the caster's record, so tidying away a **stale** copy cannot close
+    the caster's **current** line.
+  - **`isWriter()` gates both hooks**, like `gm-effects.ts`: the writes land on
+    actors a player may not own, and one designated GM doing it means one record
+    however many GMs are connected. No GM connected means no record, which is the
+    right answer for bookkeeping nobody is there to keep.
+  - Deliberately **not** automated: line of sight (Foundry's vision already stops
+    a player targeting what they cannot see, and a second stricter test would
+    refuse casts the GM allowed), and anything to do with what is *said* across
+    the link.
 - **Commune** (`src/daggerheart/commune.ts`) — the Void's Witch class feature,
   `Compendium.the-void-unofficial.classes.Item.PKcnVdqacraEf8uL`. World setting
   `communeOracle`, **on** by default, filed under Witch in the Classes tab (the
@@ -2960,7 +3016,7 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Crimson Rite and Hybrid Form under Blood Hunter; Hold Them Off, Ranger's
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
-    Tracker and Vicious Entangle under Sage, Slumber under Codex, Not Good Enough
+    Tracker and Vicious Entangle under Sage, Slumber and Telepathy under Codex, Not Good Enough
     under Blade, Not This Time and Strange
     Patterns under Wizard, Face Your Fear under Wizard,
     Attack of Opportunity and
