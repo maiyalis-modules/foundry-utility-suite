@@ -340,6 +340,28 @@ export const SETTINGS = {
    */
   telepathyLink: "telepathyLink",
   /**
+   * Master switch for **Mysterious Mist** (Codex domain, the *Book of Tyfar*):
+   * on a successful cast, the designated GM is asked which tokens on the scene
+   * the fog swallowed, and each of them is given the Hidden condition. See
+   * `daggerheart/mysterious-mist.ts`.
+   *
+   * The card's own description ends in `@Template[type:emanation|range:vc]`, so
+   * the system's answer to "heavily obscures this area and everything in it" is
+   * a measured template on a grid. A table playing in the theatre of the mind
+   * has no coordinates to measure into, and there is no fallback behind it — so
+   * the roster is asked for instead of computed, and asked of the only person
+   * who can answer it.
+   *
+   * World-scoped and **on** by default. The dialog and the write both happen on
+   * the GM's client, which makes it a table-wide fact rather than one client's
+   * preference, and it needs a GM connected. Switching it off leaves the card
+   * exactly as the SRD ships it — the Spellcast Roll against 13 is the system's
+   * own either way — and the fog is applied from the token HUD, which is what
+   * the table does today. What the condition then *means* is a separate switch:
+   * see {@link SETTINGS.hiddenConditionRolls}.
+   */
+  mysteriousMistFog: "mysteriousMistFog",
+  /**
    * Master switch for applying the damage of an action that has **no attack
    * roll** to the targets it was aimed at, which the system rolls and posts but
    * never applies. See `daggerheart/damage-landing.ts`.
@@ -358,6 +380,27 @@ export const SETTINGS = {
    * with an attack roll is touched either way, misses included.
    */
   noRollDamageApply: "noRollDamageApply",
+  /**
+   * Master switch for enforcing the two dice clauses of the **Hidden**
+   * condition: rolls made against a Hidden creature are at disadvantage, and a
+   * Hidden creature's own attacks have advantage. See
+   * `daggerheart/hidden-condition.ts`.
+   *
+   * Daggerheart ships Hidden with an id, an icon and that description, and then
+   * reads it nowhere — the same is true of Vulnerable and Restrained. The
+   * conditions are labels. This applies the half of Hidden that a die can
+   * express, through the system's own `config.advantage` / `config.disadvantage`
+   * door, *before* the roll dialog opens — so the die is lit and the player can
+   * still click it off.
+   *
+   * World-scoped and **on** by default, like every other rule switch: two
+   * clients disagreeing would resolve the same roll differently. It never
+   * *removes* the condition, so the "no longer Hidden when they move or attack"
+   * clause stays the table's, which is deliberate — that clause is about stealth
+   * and is simply untrue of fog. Switching it off leaves the condition doing
+   * what it does today, which is nothing.
+   */
+  hiddenConditionRolls: "hiddenConditionRolls",
   /**
    * Master switch for the Beastbound **Companion** card: it grows two buttons —
    * the companion's attack, and a plain action roll — and both are made as the
@@ -760,6 +803,26 @@ export const FLAGS = {
    * problem bought for nothing.
    */
   telepathy: "telepathy",
+  /**
+   * The **Mysterious Mist** fog on a creature the GM said was inside it:
+   * `{ sourceUuid }`, naming the caster.
+   *
+   * The effect *is* the fog, and there is no second record anywhere — no roster
+   * on the caster, no region on the canvas. What makes it mechanical is its
+   * `statuses: ["hidden"]`, which is the system's own condition; this flag only
+   * says *whose* fog it is, so a second cast does not stack a second copy on
+   * somebody already in the first.
+   *
+   * Written directly by the GM's client rather than relayed through
+   * `daggerheart/gm-effects.ts`: that channel deliberately never carries
+   * `statuses`, and the dialog that produces this already runs on a client with
+   * OWNER on every token on the scene.
+   *
+   * Deliberately carries no `changes`. Hidden is a property of the rolls made
+   * against a creature rather than a number on its sheet — the same reason
+   * {@link FLAGS.hex} carries none.
+   */
+  mysteriousMist: "mysteriousMist",
   /**
    * The Blighting Strike mark on a creature the strike hit: `{ sourceUuid }`,
    * naming the caster.

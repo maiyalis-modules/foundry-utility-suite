@@ -46,6 +46,8 @@ import { registerReach } from "./daggerheart/reach.js";
 import { reconcileSlayerCards, registerSlayer } from "./daggerheart/slayer.js";
 import { registerSlumber } from "./daggerheart/slumber.js";
 import { registerTelepathy } from "./daggerheart/telepathy.js";
+import { registerMysteriousMist } from "./daggerheart/mysterious-mist.js";
+import { registerHiddenCondition } from "./daggerheart/hidden-condition.js";
 import { registerStrangePatterns } from "./daggerheart/strange-patterns.js";
 import { installRollPipeline } from "./daggerheart/roll-pipeline.js";
 import { registerViciousEntangle } from "./daggerheart/vicious-entangle.js";
@@ -205,6 +207,17 @@ Hooks.once("init", async () => {
   // reaches it, so its place in this list costs nothing.
   registerSlumber();
   registerTelepathy();
+  // Nor is this one: it listens for a successful cast and asks the GM a question
+  // long after the roll it followed has posted. The condition it applies is only
+  // worth anything because of `registerHiddenCondition` below, but neither one
+  // reads the other — they meet on the token, not in this list.
+  registerMysteriousMist();
+  // A rule rather than a card, and the second listener this module puts on
+  // `daggerheart.preRoll` — the other is Hex's. Their order does not matter:
+  // that one pushes onto `roll.baseModifiers` and this one sets the two loose
+  // advantage flags the system resolves a line later, so neither can see or
+  // overwrite the other's work.
+  registerHiddenCondition();
   // Not a roll window either, and not a card that can be pressed at all: a
   // passive rule that raises a consumable's healing formula before it is rolled.
   // It patches one of the system's action fields directly, and waits for `setup`

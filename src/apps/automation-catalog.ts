@@ -476,6 +476,11 @@ const DOMAINS: Catalog = {
               name: "EE.Settings.TelepathyLink.Name",
               hint: "EE.Settings.TelepathyLink.Hint",
             },
+            {
+              key: SETTINGS.mysteriousMistFog,
+              name: "EE.Settings.MysteriousMistFog.Name",
+              hint: "EE.Settings.MysteriousMistFog.Hint",
+            },
           ],
         },
       ],

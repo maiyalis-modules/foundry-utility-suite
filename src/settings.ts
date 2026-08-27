@@ -407,11 +407,6 @@ export function registerSettings(): void {
     default: true,
   });
 
-  // World-scoped, and here that is load-bearing rather than conventional: the
-  // guard cancels a deletion and spends the GM's Fear, so a per-user version
-  // would make the same right-click do two different things depending on which
-  // GM pressed it. Read at the moment of the delete, so a change takes effect on
-  // the very next one.
   // World-scoped because the record is written by the GM's client onto actors a
   // player may not own, so a per-user version would mean the same cast tracked
   // itself on one screen and not another. Read at the moment a connection opens
@@ -425,6 +420,24 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // World-scoped because the dialog is raised on one client and the effects it
+  // writes are read by every other. Checked twice — once by the casting client
+  // before it asks, once by the GM's before it acts — so switching it off stops
+  // the very next cast rather than the one after.
+  game.settings.register(MODULE_ID, SETTINGS.mysteriousMistFog, {
+    name: "EE.Settings.MysteriousMistFog.Name",
+    hint: "EE.Settings.MysteriousMistFog.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
+  // World-scoped, and here that is load-bearing rather than conventional: the
+  // guard cancels a deletion and spends the GM's Fear, so a per-user version
+  // would make the same right-click do two different things depending on which
+  // GM pressed it. Read at the moment of the delete, so a change takes effect on
+  // the very next one.
   game.settings.register(MODULE_ID, SETTINGS.slumberFearGuard, {
     name: "EE.Settings.SlumberFearGuard.Name",
     hint: "EE.Settings.SlumberFearGuard.Hint",
@@ -440,6 +453,20 @@ export function registerSettings(): void {
   game.settings.register(MODULE_ID, SETTINGS.noRollDamageApply, {
     name: "EE.Settings.NoRollDamageApply.Name",
     hint: "EE.Settings.NoRollDamageApply.Hint",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true,
+  });
+
+  // World-scoped because it changes how a roll is built, and the roll is built
+  // on whichever client pressed the button. A per-user answer would mean the
+  // same attack on the same Hidden creature was tilted or not depending on who
+  // rolled it. Read as each roll is configured, so a change takes effect on the
+  // very next one.
+  game.settings.register(MODULE_ID, SETTINGS.hiddenConditionRolls, {
+    name: "EE.Settings.HiddenConditionRolls.Name",
+    hint: "EE.Settings.HiddenConditionRolls.Hint",
     scope: "world",
     config: false,
     type: Boolean,

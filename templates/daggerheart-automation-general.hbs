@@ -33,4 +33,17 @@
     </div>
   </fieldset>
 
+  <fieldset>
+    <legend>{{localize "EE.Automation.ConditionsLegend"}}</legend>
+
+    <div class="form-group">
+      <label for="ee-hidden-condition">{{localize "EE.Settings.HiddenConditionRolls.Name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" id="ee-hidden-condition" name="hiddenConditionRolls"
+               {{#if hiddenCondition}}checked{{/if}}>
+      </div>
+      <p class="hint">{{localize "EE.Settings.HiddenConditionRolls.Hint"}}</p>
+    </div>
+  </fieldset>
+
 </section>

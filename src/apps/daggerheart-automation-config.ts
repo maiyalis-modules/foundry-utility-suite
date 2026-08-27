@@ -68,6 +68,7 @@ export class DaggerheartAutomationConfig extends ConfigWindow {
   protected override settingKeys = [
     SETTINGS.reachMeleeAsVeryClose,
     SETTINGS.noRollDamageApply,
+    SETTINGS.hiddenConditionRolls,
     ...catalogSettingKeys(),
   ];
 
@@ -86,6 +87,7 @@ export class DaggerheartAutomationConfig extends ConfigWindow {
       voidActive: game.modules.get(VOID_MODULE_ID)?.active === true,
       reach: DaggerheartAutomationConfig.flag(SETTINGS.reachMeleeAsVeryClose),
       noRollDamage: DaggerheartAutomationConfig.flag(SETTINGS.noRollDamageApply),
+      hiddenCondition: DaggerheartAutomationConfig.flag(SETTINGS.hiddenConditionRolls),
     };
   }
 

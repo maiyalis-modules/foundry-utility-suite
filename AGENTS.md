@@ -1580,6 +1580,110 @@ loads).
     a player targeting what they cannot see, and a second stricter test would
     refuse casts the GM allowed), and anything to do with what is *said* across
     the link.
+- **Mysterious Mist** (`src/daggerheart/mysterious-mist.ts`) — the third action on
+  the *Book of Tyfar* (`Compendium.daggerheart.domains.Item.1VXzwRbvbBj5bd5V`,
+  action `WQ9XzpbtXl4SmVet`): "Make a Spellcast Roll (13) to cast a temporary
+  thick fog that gathers in a stationary area within Very Close range. The fog
+  heavily obscures this area and everything in it." World setting
+  `mysteriousMistFog`, **on** by default, filed under Codex beside Slumber and
+  Telepathy.
+  - **The front half is already whole.** An `attack` action with
+    `roll.difficulty: 13`, no damage and no effects — press the card, roll against
+    13, read the result. Nothing here touches any of it.
+  - **The system's own answer to the second sentence is a grid answer.** The
+    action's description ends with `@Template[type:emanation|range:vc]`, which
+    wants a measured emanation dropped on the canvas. Correct on a battlemap,
+    worth nothing in the theatre of the mind, and there is **no fallback behind
+    it**. Do not try to re-derive the area — that is the assumption this file
+    exists to route around.
+  - **The reframing to keep in mind if you extend this**: on a map the mist is a
+    *region* and the question is "is this token inside it?"; without a map it is a
+    *roster* and the question is "who is in it?", which is a decision about the
+    fiction. So it is **asked, never computed**.
+  - **The GM is asked, not the caster.** `daggerheart.postUseAction` fires on the
+    casting client; where an area lands and who is standing in it is the GM's
+    call, and so is the write (the fog mostly lands on adversaries, and core needs
+    OWNER to create an ActiveEffect). One socket message (`mysteriousMistRaise`,
+    carrying `{ casterUuid, casterName, sceneId }`) and `isWriter()` on the far
+    side solve both. Skipped entirely when the caster *is* the writing GM, the
+    same short-circuit `markActor` takes.
+  - **Nothing off the wire is trusted.** `readRequest` resolves the caster and
+    re-reads the name off the resolved Actor; the scene falls back to
+    `canvas.scene`. Every other decision — that the effect is Hidden, its name,
+    its duration — comes from the fixed shape in the file.
+  - **Written directly, not through `gm-effects.ts`.** That channel's header
+    promises its effects "can never carry `changes`, `statuses`, a duration or a
+    script", and this one is a `statuses` effect. **Do not widen that contract for
+    this**: the dialog already runs on a client with OWNER on every token on the
+    scene, so the create is local anyway.
+  - **The effect** is `statuses: ["hidden"]` with `duration.type: "temporary"` and
+    no `changes`, flagged `flags.eryndor-essentials.mysteriousMist =
+    { sourceUuid }`. What makes it mechanical is `hidden-condition.ts`; on its own
+    it is a faster way to apply a label.
+  - **Nothing ever expires it.** `temporary` is the one duration
+    `expireActiveEffects` deliberately filters *out*, which is the system saying a
+    temporary thing ends when the table says so. No scene hook, no combat hook, no
+    countdown — the GM clicks the icon off.
+  - **Three deliberate silences.** A recast does *not* disperse the previous fog
+    (the card nowhere says there may be only one; a creature already in this
+    caster's fog just gets no second copy). An empty answer changes nothing —
+    `chooseUpTo` cannot tell a deliberate empty confirm from a dismissal, and this
+    module does not destroy state on a non-answer. Range is not measured.
+  - **Matched on shape as well as name.** The card carries *two* `attack` actions,
+    so type alone will not separate Wild Flame from the fog: Wild Flame deals
+    damage and sets no difficulty, the fog deals none and sets 13.
+- **Hidden** (`src/daggerheart/hidden-condition.ts`) — not a card. World setting
+  `hiddenConditionRolls`, **on** by default, filed under **General → Conditions**
+  in the Automation window (the third fieldset on that tab).
+  - **Read this before adding any condition automation.** Daggerheart ships three
+    conditions — *Vulnerable*, *Hidden*, *Restrained* — each with an id, an icon
+    and a printed description, and **the system reads none of them**. Outside
+    `CONFIG.DH.GENERAL.conditions()` the only occurrences of `'hidden'` in the
+    2.7.2 bundle are CSS class toggles. Vulnerable's `vulnerableAutomation`
+    decides when the condition is *applied* (at max Stress); the single place that
+    inspects `statuses.has('vulnerable')` is asking whether the auto-applied copy
+    may be removed. The conditions are stickers.
+  - **The seam is `daggerheart.preRoll`**, and three things make it right rather
+    than merely early:
+    1. **Targets are already resolved.** `Action#use` calls `prepareConfig`, which
+       runs *every* field's `prepareConfig` — `TargetField`'s included — before
+       `executeWorkflow` runs any of them. **The `order` numbers govern `execute`,
+       not `prepare`**, so `config.targets` is populated at roll time even though
+       `TargetField.order` (20) is larger than `RollField.order` (10). This is a
+       standing correction to the note in `adversary-attack.ts`'s header, which is
+       about `TargetField.execute`.
+    2. **The system has its own door**: `D20Roll.applyKeybindings` runs on the very
+       next line and reads two loose booleans, `config.advantage` and
+       `config.disadvantage`, alongside the held keys and the pre-set mode. Write
+       *those*, never `config.roll.advantage` — the cancelling rule comes free, so
+       two Hidden creatures swinging at each other roll flat without this file
+       knowing anything about it.
+    3. **`applyKeybindings` runs before the roll dialog**, so the die is lit and
+       the player can still click it off. This lights a button; it does not hold
+       it down.
+    `DualityRoll extends D20Roll` and does not override `applyKeybindings`, so one
+    seam covers an adversary's flat d20 and a character's Duality roll alike.
+  - **Which clauses are applied**: disadvantage on any roll *against* a Hidden
+    creature (`attack`, `spellcast`, `trait` — `diceSet` has no target), and
+    advantage on a Hidden creature's own `attack` or `spellcast`. The clause says
+    *attack* where the other says *rolls*; keep the two lists apart.
+  - **Which are not, and why.** "Attacks cannot be made directly targeting them" —
+    refusing to build a roll is a different kind of act from tilting one. "No
+    longer Hidden when they move or attack" — **do not implement this**: it is a
+    stealth rule, it is simply untrue of fog, and adding it would make
+    `mysterious-mist.ts` wrong. Nothing on the condition says which kind it is, so
+    this module never removes it.
+  - **The roller is skipped when reading the target side.** A self-targeted action
+    lists the roller in its own `config.targets`; without the guard a Hidden
+    creature would earn both flags and cancel to flat — the right answer reached
+    by an accident that would break the moment either clause changed.
+  - `config.roll.type` is read **directly**, not through `roll-pipeline.ts`'s
+    `rollTypeOf`: at `preRoll` the field still holds the truth (the overwrite that
+    helper survives happens in `buildEvaluate`), and going through it would make
+    this depend on listener registration order.
+  - **Never return `false` from this hook** — on `preRoll` that cancels the roll.
+  - The obvious extension is Vulnerable ("all rolls targeting them have
+    advantage"), which is the same seam and the opposite flag.
 - **Commune** (`src/daggerheart/commune.ts`) — the Void's Witch class feature,
   `Compendium.the-void-unofficial.classes.Item.PKcnVdqacraEf8uL`. World setting
   `communeOracle`, **on** by default, filed under Witch in the Classes tab (the
@@ -3016,7 +3120,7 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Crimson Rite and Hybrid Form under Blood Hunter; Hold Them Off, Ranger's
     Focus and Companion under Ranger;
     Blood Spike under the Blood domain, I See It Coming under Bone, Gifted
-    Tracker and Vicious Entangle under Sage, Slumber and Telepathy under Codex, Not Good Enough
+    Tracker and Vicious Entangle under Sage, Slumber, Telepathy and Mysterious Mist under Codex, Not Good Enough
     under Blade, Not This Time and Strange
     Patterns under Wizard, Face Your Fear under Wizard,
     Attack of Opportunity and
