@@ -19,12 +19,17 @@
  * ## Nothing off the socket is trusted
  *
  * The payload is a **description of a mark**, never effect data. The GM's client
- * builds the ActiveEffect itself from a fixed shape — name, image, flag — so the
- * worst a malformed or hostile message can do is put a labelled, changeless
- * marker on an actor, which is a thing that client could do from the token HUD
- * anyway. It can never carry `changes`, `statuses`, a duration or a script. Same
- * principle as `feature-ask.ts`: the wire carries an intent, and the receiving
- * client decides what that intent means.
+ * builds the ActiveEffect itself from a fixed shape — name, image, flag, and for
+ * the one kind that carries a rule (`hex`) a fixed list of `changes` written in
+ * this file — so the worst a malformed or hostile message can do is put one of
+ * these known markers on an actor, which is a thing that client could do from
+ * the token HUD anyway. Nothing on the wire can add a change, a status, a
+ * duration or a script. The one thing a request can *point at* is an `origin`
+ * Item, which the fixed changes resolve `ORIGIN.@…` against; it is accepted
+ * only when it is an Item embedded in the actor the request names as its
+ * source, so a client cannot borrow a bigger tier from somebody else's sheet.
+ * Same principle as `feature-ask.ts`: the wire carries an intent, and the
+ * receiving client decides what that intent means.
  *
  * One GM applies it — `isWriter` picks the same single client the Session Log
  * uses — so a table with three GMs logged in gets one effect, not three.
@@ -53,40 +58,99 @@ export interface MarkRequest {
   sourceName: string;
   /** The marking actor's uuid, so the mark can be found and cleared later. */
   sourceUuid: string;
+  /**
+   * An Item on the marking actor to set as the effect's `origin`, for a kind
+   * whose changes read `ORIGIN.@…`. Optional; checked on arrival, see the header.
+   */
+  originUuid?: string;
+}
+
+/** One change a mark's fixed shape carries, in the system's own field shape. */
+interface MarkChange {
+  key: string;
+  type: "add" | "subtract" | "override";
+  value: string;
+  priority: null;
+  phase: "initial";
+}
+
+/** How a kind of mark looks, and what — if anything — it does. */
+interface MarkShape {
+  flag: string;
+  nameKey: string;
+  descriptionKey: string;
+  img: string;
+  /**
+   * The rule the mark carries, if any. Fixed here, never from the wire. A shape
+   * with changes needs a valid `originUuid` on the request when any change
+   * reads `ORIGIN.@…`, or the changes are left off — an unresolvable `ORIGIN`
+   * would put a non-number into a subtract.
+   */
+  changes?: readonly MarkChange[];
+  /** `system.duration.type`. Omitted means the system's default (none). */
+  durationType?: string;
 }
 
 /** The flag key each kind writes, and how it labels and illustrates itself. */
-const MARKS: Record<MarkKind, { flag: string; nameKey: string; descriptionKey: string; img: string }> =
-  {
-    rangersFocus: {
-      flag: FLAGS.rangersFocusTarget,
-      nameKey: "EE.Features.RangersFocus.TargetEffectName",
-      descriptionKey: "EE.Features.RangersFocus.TargetEffectDescription",
-      img: "icons/magic/perception/eye-ringed-green.webp",
-    },
-    blightingStrike: {
-      flag: FLAGS.blightingStrikeMark,
-      nameKey: "EE.Features.BlightingStrike.MarkName",
-      descriptionKey: "EE.Features.BlightingStrike.MarkDescription",
-      img: "icons/magic/unholy/strike-beam-blood-red-purple.webp",
-    },
-    tetheredTalisman: {
-      flag: FLAGS.tetheredTalisman,
-      nameKey: "EE.Features.TetheredTalisman.EffectName",
-      descriptionKey: "EE.Features.TetheredTalisman.EffectDescription",
-      // The Void's own art for the card, so the effect and the feature look like
-      // the same thing on two different sheets.
-      img: "icons/equipment/neck/necklace-simple-carved-arrow.webp",
-    },
-    hex: {
-      flag: FLAGS.hex,
-      nameKey: "EE.Features.Hex.EffectName",
-      descriptionKey: "EE.Features.Hex.EffectDescription",
-      // The Void's own art for the card, so the condition on the adversary and
-      // the feature on the witch's sheet read as the same thing.
-      img: "icons/magic/unholy/orb-contained-pink.webp",
-    },
-  };
+const MARKS: Record<MarkKind, MarkShape> = {
+  rangersFocus: {
+    flag: FLAGS.rangersFocusTarget,
+    nameKey: "EE.Features.RangersFocus.TargetEffectName",
+    descriptionKey: "EE.Features.RangersFocus.TargetEffectDescription",
+    img: "icons/magic/perception/eye-ringed-green.webp",
+  },
+  blightingStrike: {
+    flag: FLAGS.blightingStrikeMark,
+    nameKey: "EE.Features.BlightingStrike.MarkName",
+    descriptionKey: "EE.Features.BlightingStrike.MarkDescription",
+    img: "icons/magic/unholy/strike-beam-blood-red-purple.webp",
+  },
+  tetheredTalisman: {
+    flag: FLAGS.tetheredTalisman,
+    nameKey: "EE.Features.TetheredTalisman.EffectName",
+    descriptionKey: "EE.Features.TetheredTalisman.EffectDescription",
+    // The Void's own art for the card, so the effect and the feature look like
+    // the same thing on two different sheets.
+    img: "icons/equipment/neck/necklace-simple-carved-arrow.webp",
+  },
+  hex: {
+    flag: FLAGS.hex,
+    nameKey: "EE.Features.Hex.EffectName",
+    descriptionKey: "EE.Features.Hex.EffectDescription",
+    // The SRD card's own art, so the condition on the adversary and the
+    // feature on the witch's sheet read as the same thing.
+    img: "icons/magic/control/voodoo-doll-pain-damage-purple.webp",
+    // The SRD card's own effect, change for change: "a penalty to their damage
+    // rolls and Difficulty equal to your tier", with the tier read off the
+    // origin — the witch's card — by the system's `getChangeValue`.
+    changes: [
+      {
+        key: "system.difficulty",
+        type: "subtract",
+        value: "ORIGIN.@tier",
+        priority: null,
+        phase: "initial",
+      },
+      {
+        key: "system.bonuses.damage.physical.bonus",
+        type: "subtract",
+        value: "ORIGIN.@tier",
+        priority: null,
+        phase: "initial",
+      },
+      {
+        key: "system.bonuses.damage.magical.bonus",
+        type: "subtract",
+        value: "ORIGIN.@tier",
+        priority: null,
+        phase: "initial",
+      },
+    ],
+    // "Temporarily": the system's `temporary` is the one duration its rest and
+    // session refreshes leave alone, which is what "no moment named" means.
+    durationType: "temporary",
+  },
+};
 
 /** Is `value` a usable, non-empty string? */
 function text(value: unknown): string {
@@ -102,7 +166,30 @@ function readRequest(payload: AnyObject): MarkRequest | null {
   const sourceUuid = text(payload["sourceUuid"]);
   if (!actorUuid || !sourceUuid) return null;
 
-  return { kind, actorUuid, sourceUuid, sourceName: text(payload["sourceName"]) };
+  const request: MarkRequest = {
+    kind,
+    actorUuid,
+    sourceUuid,
+    sourceName: text(payload["sourceName"]),
+  };
+  const originUuid = text(payload["originUuid"]);
+  if (originUuid) request.originUuid = originUuid;
+  return request;
+}
+
+/**
+ * The `origin` this request may set, or null: an Item embedded in the source
+ * actor, and nothing else. See the header on why this is checked here rather
+ * than trusted.
+ */
+function acceptedOrigin(request: MarkRequest): string | null {
+  if (!request.originUuid) return null;
+
+  const item = fromUuidSync(request.originUuid) as AnyObject | null;
+  if (!item || item["documentName"] !== "Item") return null;
+  if (String(item["parent"]?.["uuid"] ?? "") !== request.sourceUuid) return null;
+
+  return request.originUuid;
 }
 
 /** The mark of this kind on this actor, placed by this source, if any. */
@@ -130,7 +217,20 @@ async function applyMark(request: MarkRequest): Promise<void> {
   // marker. Clearing first also keeps a retry after a failed write idempotent.
   await clearMark(request);
 
-  const { nameKey, descriptionKey, img, flag } = MARKS[request.kind];
+  const { nameKey, descriptionKey, img, flag, changes, durationType } = MARKS[request.kind];
+
+  // Only the changes written in this file, and only when what they read
+  // against is there. A kind with no changes is the label it always was.
+  const origin = acceptedOrigin(request);
+  const needsOrigin = (changes ?? []).some((change) => /origin\.@/i.test(change.value));
+  const applied =
+    changes && (!needsOrigin || origin) ? changes.map((change) => ({ ...change })) : [];
+  if (changes && applied.length === 0) {
+    console.warn(
+      `${LOG_PREFIX} GM effects: ${request.kind} on ${request.actorUuid} has no usable origin; ` +
+        "placing the label without its changes.",
+    );
+  }
 
   await actor["createEmbeddedDocuments"]?.("ActiveEffect", [
     {
@@ -140,9 +240,11 @@ async function applyMark(request: MarkRequest): Promise<void> {
       disabled: false,
       transfer: false,
       type: "base",
-      // Never anything mechanical. This is a label the table can see, and the
-      // reason the payload can be trusted at all — see the header.
-      system: { changes: [] },
+      ...(origin ? { origin } : {}),
+      system: {
+        changes: applied,
+        ...(durationType ? { duration: { type: durationType, description: "" } } : {}),
+      },
       flags: { [MODULE_ID]: { [flag]: { sourceUuid: request.sourceUuid } } },
     },
   ]);

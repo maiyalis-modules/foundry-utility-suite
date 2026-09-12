@@ -184,6 +184,106 @@ loads).
   setting `voidHybridFormStressRevert`, **on by default** (unlike the portrait
   settings above) — this isn't optional artwork, it's a rule Void already half-
   implements; leaving it off leaves that half-implementation in place.
+- **Hiding The Void's deprecated content** (`src/integrations/void-deprecated-content.ts`)
+  — *optional* integration with The Void (Unofficial). The Hope and Fear SRD
+  absorbed a large slice of what Void was once the only source for — the Witch,
+  Warlock, Assassin and Brawler, all 8 of their subclasses, the Dread domain,
+  **all six** of its ancestries, **all six**
+  of its communities, **all four** environments and 14 of its 17 adversaries — so
+  every picker shows each of those twice. The two copies are **not** the same
+  text: Void's are pre-release, the SRD's are final, and some differ mechanically
+  (Blighting Strike is flat `d6+1` plus a rider in Void, `d6+1` on Hope / `d10+1`
+  on Fear in the SRD; Aetheris's second feature is *Divine Countenance* in Void
+  and **Celestial Wings** in the SRD; Gnome's is *Magical Sense* vs **Flicker
+  Step**). World setting `hideVoidDeprecatedContent`, **off by default**, in the
+  Daggerheart Utilities window.
+  - **Display-only, and that is the whole safety argument.** Both patches filter a
+    list on its way to being drawn; `pack.index`, `pack.getDocuments()`,
+    `fromUuid` and the system's `fetchSubclasses` are untouched, so a character
+    already holding Void's Assassin keeps it, still levels into Void's subclasses,
+    and prints what it always printed. Nothing is deleted, edited or unlinked, and
+    turning the setting off restores every row.
+  - **The duplicate set is derived at runtime, never hardcoded**: a Void entry is
+    deprecated when a document of the same `type` and the same name lives in a
+    pack whose `metadata.packageType === "system"`. Comparing against the
+    *system's* packs and not merely "non-Void" ones is what stops a world
+    compendium of copied cards from hiding the originals. Self-maintaining both
+    ways — when Void drops its copies nothing matches, and when a later SRD
+    absorbs the Blood domain those cards start hiding themselves. Names are
+    compared with apostrophes deleted and every other non-alphanumeric run
+    collapsed to one space — Void writes `Executioner’s Guild`, the system
+    `Executioner's Guild`.
+  - **A `domainCard` is judged by its `system.domain`, not its name**, and that
+    exception is load-bearing rather than tidy. Card-by-card matching leaves a
+    deck half from each source, and the seams don't line up: Void's `Umbra Veil`
+    is the SRD's **`Umbral Veil`** — a rename no name match can see, which
+    survived as a phantom twin of a card already on the list. So once the SRD
+    publishes a domain *at all*, Void's whole copy of it goes. `blood` has no SRD
+    counterpart, so all 21 of those cards stay.
+    - The SRD's domain list is read off its **packs**, never `CONFIG.DH`: Void
+      registers its own `blood` domain with the system, so the config list is the
+      union of both and would mark every Void card duplicated.
+    - `system.domain` is **not** a core `compendiumIndexField`, and the server
+      builds the startup index knowing nothing of client `CONFIG` — which is why
+      the system itself has to `await pack.getIndex({fields: […]})` for
+      `system.linkedClass` in `fetchSubclasses`. `ensureDomainIndex()` does the
+      same for `system.domain` across the ~5 packs holding domain cards; core
+      merges the fields into the existing entries and records that it has, so it
+      is one round trip per pack per session and every later read is sync.
+    - Consequence for ordering: the trees built during `setup` see no domains
+      yet and fall back to the name match, so the `ready` hook loads the index and
+      calls `redraw()` to rebuild them. `refreshVoidDeprecatedContent()` awaits
+      the same thing, because the first time the switch is turned on the domains
+      still aren't indexed — redrawing before they land would leave the renamed
+      cards behind, which is exactly the bug the domain rule exists to fix.
+  - Everything else reads `pack.index` only (`_id`/`name`/`type` are core
+    `compendiumIndexFields`, filled synchronously in `CompendiumCollection`'s
+    constructor), so it costs no document loads and no `await`.
+  - **Two surfaces, two patches.** `CompendiumBrowserSettings#isEntryExcluded`
+    (`game.system.api.models`) covers every card picker at once, because
+    `ItemBrowser.loadItems()` already runs every result through it and the system
+    re-opens that one shared browser for character creation, level-up and plain
+    browsing alike — the same seam `deck-limit-browser.ts` leans on. The system's
+    own *Compendium Browser Settings* dialog is no substitute: it excludes a whole
+    pack per document type, and every Void pack that matters mixes duplicated
+    content with content found nowhere else (its classes pack holds Assassin *and*
+    Blood Hunter). `CompendiumCollection#_getVisibleTreeContents` covers the
+    compendium sidebar — filtering there rather than hiding DOM rows means the
+    entry is gone before the tree is built, so core's search can't turn it up
+    again and folder counts stay honest.
+  - **`registerVoidDeprecatedContent()` must run in `init`.** `Game#setupGame`
+    calls `initializePacks()` then `initializeTrees()` **before** the `setup`
+    hook, so a sidebar patch applied any later leaves every tree already built
+    from the unfiltered list. The browser patch is deferred to `setup` instead,
+    since `game.system.api` is assigned during the *system's* `init`.
+  - **`feature` is deliberately not in `HIDEABLE_TYPES`**, and is the one place
+    the name match isn't safe: 143 of Void's top-level feature items share a name
+    with an SRD feature, and **Regeneration** belongs to *Order of the Lycan* — a
+    Void-only subclass that stays on offer. Separating those means resolving every
+    parent's `system.features[].item` UUIDs, which aren't in the index and would
+    cost a `getDocuments()` over every Void pack at startup. Features are never
+    *picked* anyway; they arrive with the card that prints them. The accepted cost
+    is that `void-adv-features` still lists its ~55 drag-onto-an-adversary
+    features, some duplicating the system's.
+  - The setting's `onChange` calls `refreshVoidDeprecatedContent()`, which is the
+    one thing here that can't be lazy: the SRD key set is cached and each Void
+    pack's tree is *built* from it, so flipping the switch has to drop the cache,
+    re-run `pack.initializeTree()` and re-render. `pack.render()` is core's own
+    fan-out to applications registered against that collection, so an open
+    compendium updates in place and a closed one costs nothing.
+    - **The card picker also needs `loadItems()` called by hand.** `ItemBrowser`
+      fills `.item-list` from `loadItems()`, which is **not** driven by
+      `_onRender` — the system always calls the two together (its own
+      `openSettings`, and its `DhCompendiumBrowserRefresh` socket handler do
+      exactly that). Rendering alone repaints the frame around rows built before
+      the switch moved, which looks precisely like the filter not working. No
+      socket emit to go with it, unlike `openSettings`: this is a *world*
+      setting, so Foundry already fires `onChange` on every client.
+  - Measured against Daggerheart 2.9.3 / Void 1.3.3: **67 entries hidden**, 251
+    left visible — Blood Hunter, Summoner, all five of their subclasses, all 21
+    Blood domain cards, the Lifeblood Talisman consumable, Doppelhünd, Xero and
+    the Unarmed Strike weapons all stay. All 21 Dread cards go, `Umbra Veil`
+    included.
 - **Target Helper hookup** (`src/integrations/target-helper-survey.ts`) — the one
   place here that talks to the sibling module **Maiyalis: Target Helper**
   (`daggerheart-target-helper`) through `game.modules.get(…).api`. *Optional*
@@ -460,7 +560,7 @@ loads).
     missing portrait still leaves a face-shaped hole in a column of faces. It is
     filled by `toPromptOffers` for anything asked out of the registry, and by
     hand in the windows that build a `PromptOffer` themselves (`witchs-charm.ts`,
-    `hex.ts`, `tethered-talisman.ts`, `blood-spike.ts`) — add it there when you
+    `tethered-talisman.ts`, `blood-spike.ts`) — add it there when you
     write the next one. The name beside it is still shown only when it *differs*
     from the feature label; the artwork always is, since it repeats nothing else
     on screen and is how a player recognises a card without reading it.
@@ -939,11 +1039,16 @@ loads).
     direct write: the roll is about to queue its own +1 Hope into the same map,
     and on a Hope result the two correctly cancel to a single net-zero write.
 - **Blighting Strike** (`src/daggerheart/blighting-strike.ts`) — the Dread
-  domain's (*Void for Daggerheart*) "Make a Spellcast Roll against a target
-  within Far range. On a success, the target takes d6+1 magic damage using your
-  Proficiency … If you succeed with Fear, the target instead takes d10+1 magic
-  damage using your Proficiency."
-  `Compendium.the-void-unofficial.domains.Item.BIze56vTneG5UJv6`. World setting
+  domain's "Make a Spellcast Roll against a target within Far range. On a
+  success: On a roll with Hope, deal d6+1 magic damage using your Proficiency.
+  On a roll with Fear, deal d10+1 magic damage using your Proficiency. The
+  target's next successful attack deals half damage. On a failure, you must
+  spend a Hope or mark a Stress." Two homes, both matched by source:
+  `Compendium.daggerheart.domains.Item.CEOM585jIX8V9PHz` (Hope and Fear SRD,
+  Daggerheart 2.9.3) and `Compendium.the-void-unofficial.domains.Item.BIze56vTneG5UJv6`
+  (*Void for Daggerheart*, which it was written against — same three-action
+  shape; its rider read "the next time the target deals damage to an ally, it
+  is reduced by half" and it had no failure clause). World setting
   `blightingStrikeDamage`, **on** by default, under **Domains → Dread** in
   `daggerheartAutomationMenu`. **Not a workflow feature at all — it repairs the
   card's shape at preparation time and then gets out of the way.**
@@ -951,9 +1056,10 @@ loads).
     `DHResourceData.resultBased` makes `DamageField.getFormulaValue` return a
     damage part's `valueAlt` instead of its `value` when
     `data.roll.result.duality === -1` (and `data` there is the workflow *config*,
-    despite the parameter name — `formatFormulas` is called with it). The Void
-    instead ships an `attack` with `damage.main: null` and two loose `damage`
-    actions, "Damage (Hope)" (d6+1) and "Damage (Fear)" (d10+1).
+    despite the parameter name — `formatFormulas` is called with it). Both cards
+    instead ship an `attack` with `damage.main: null` and two loose `damage`
+    actions — "With Hope" (d6+1) and "With Fear" (d10+1) in the SRD, "Damage
+    (Hope)" / "Damage (Fear)" in the Void; `readCard` matches on the words.
   - **Three costs of the split, all of them real** — and the reason chaining the
     second action from `postUseAction` was tried first and abandoned:
     1. A `damage` action has no roll, so `TargetField.execute` leaves every
@@ -990,8 +1096,19 @@ loads).
     `ActionSelectionDialog`, so a hotbar press just casts. An earlier
     `card-action-choice.ts` existed to force that and was deleted when this
     stopped needing it.
-  - **The "reduced by half" rider is automated**, and is the only part of the card
-    that is — nothing declares it, so nothing native can carry it. Two halves:
+  - **The SRD's native rider is stripped from the rebuilt action.** The SRD card
+    carries "Blightning Strike" [sic], an ActiveEffect on the Spellcast Roll that
+    `override`s `system.rules.attack.damage.hpDamageMultiplier` to `0.5` on the
+    target — `DamageRoll` reads that off the attacker and halves *every* damage
+    roll they make. No duration, so it never lifts on its own; no "successful
+    attack" condition; and `EffectsField.applyEffect` is a bare
+    `ActiveEffect.create`, refused to a player's client for an adversary. Beside
+    the mark below it would halve twice. `isNativeRider` recognises it by the
+    change key (not its id or name) and `buildCastAction` filters it out of the
+    action's `effects`; anything else hung on the action stays, and `reset()`
+    restores it — display-only like the rest of the reshape.
+  - **The rider is automated** — "the target's next successful attack deals half
+    damage" — and with the native effect gone it is the only carrier. Two halves:
     1. **The mark.** On a hit, `daggerheart.postUseAction` reads `target.hit` and
        asks `gm-effects.ts` for a `blightingStrike` marker on each one, relayed to
        the GM because a player cannot write an ActiveEffect to an adversary. The
@@ -1005,16 +1122,28 @@ loads).
     discards everything else, so the hook never learns who dealt the damage.
     `applyDamage` is the seam that knows all three of attacker
     (`config.source.actor`), targets, and the still-changeable packet.
-  - **"An ally" is Friendly token disposition** (the table's choice), resolved
-    through the same token lookup `applyDamage` does two lines later — scene token
-    when the target entry names one, `actor.prototypeToken` otherwise.
+  - **"Successful attack" is `config.hasRoll`.** `applyDamage` only runs for
+    targets the roll hit, so a rolled action reaching the seam has succeeded;
+    the check excludes damage that never rolled to hit. A miss reaches no seam
+    and spends nothing. The Void's "to an ally" qualifier — the first cut
+    filtered on Friendly token disposition — is gone from the SRD and from here.
   - Only `damage.main` is halved, with `Math.ceil`, matching
     `Actor#calculateDamage`'s `Math.ceil(baseDamage / 2)` for resistance. A damage
     roll's resource entries are costs, not damage. The mark is cleared **in the
     `before` phase**, not after: clearing on the way out would leave it standing
     if application threw.
-  - The mark never expires on its own. The card says "the next time" with no
-    limit, so that is faithful; deleting the effect is one click.
+  - The mark never expires on its own. The card says "next" with no limit, so
+    that is faithful; deleting the effect is one click.
+  - **The failure clause is asked, not charged.** `collectOnFailure` on
+    `postUseAction` reads `config.roll.success === false` (settled by
+    `D20Roll.buildEvaluate`: no target hit, or below the difficulty; neither
+    present means nothing is judged) and raises an untimed `chooseOne` on the
+    caster's own client — "Spend a Hope" only when `canAfford` says there is one,
+    "Mark a Stress" always, since `modifyResource` converts an unmarkable Stress
+    to a Hit Point, which is the printed rule. Charged via `modifyResource` on
+    the caster (own sheet, no relay) and announced in chat. A dismissed dialog
+    charges nothing and posts that the price is still owed: a resource taken
+    behind a closed dialog is the one thing a player could not see.
 - **I See It Coming** (`src/daggerheart/i-see-it-coming.ts`) — the Bone domain's
   (SRD) "When you're targeted by an attack made from beyond Melee range, you can
   mark a Stress to roll a d4 and gain a bonus to your Evasion equal to the result
@@ -1170,8 +1299,15 @@ loads).
     socket request, handled by `isWriter`'s single GM. **The payload is a
     description of a mark, never effect data** — the GM's client builds the
     ActiveEffect from a fixed table keyed on `MarkKind`, so a malformed or
-    hostile message can at worst place a labelled, changeless marker, never
-    `changes`, `statuses`, a duration or a script. Same principle as
+    hostile message can at worst place one of the known markers — nothing on
+    the wire can add a change, a status, a duration or a script. One kind
+    (`hex`) carries a fixed list of `changes` written in the table itself,
+    resolving `ORIGIN.`; the request may name an `originUuid` for that,
+    and the GM's client accepts it only when it is an Item embedded in the
+    actor the request names as its source (`acceptedOrigin`), so a client
+    cannot borrow a bigger tier from somebody else's sheet. A change-carrying
+    kind without a usable origin is placed as a label with a console warning,
+    never with an unresolvable value in a subtract. Same principle as
     `feature-ask.ts`: the wire carries intent, the receiver decides what it
     means. Applied directly, without the socket, when this client already owns
     the subject.
@@ -1611,9 +1747,9 @@ loads).
     re-reads the name off the resolved Actor; the scene falls back to
     `canvas.scene`. Every other decision — that the effect is Hidden, its name,
     its duration — comes from the fixed shape in the file.
-  - **Written directly, not through `gm-effects.ts`.** That channel's header
-    promises its effects "can never carry `changes`, `statuses`, a duration or a
-    script", and this one is a `statuses` effect. **Do not widen that contract for
+  - **Written directly, not through `gm-effects.ts`.** That channel's shapes
+    are fixed in its own table and nothing on the wire can add `statuses`, and
+    this one is a `statuses` effect. **Do not widen that contract for
     this**: the dialog already runs on a client with OWNER on every token on the
     scene, so the create is local anyway.
   - **The effect** is `statuses: ["hidden"]` with `duration.type: "temporary"` and
@@ -1684,8 +1820,12 @@ loads).
   - **Never return `false` from this hook** — on `preRoll` that cancels the roll.
   - The obvious extension is Vulnerable ("all rolls targeting them have
     advantage"), which is the same seam and the opposite flag.
-- **Commune** (`src/daggerheart/commune.ts`) — the Void's Witch class feature,
-  `Compendium.the-void-unofficial.classes.Item.PKcnVdqacraEf8uL`. World setting
+- **Commune** (`src/daggerheart/commune.ts`) — the Witch class feature. Two
+  homes since the Hope and Fear SRD absorbed the Witch (Daggerheart 2.9.3):
+  `Compendium.daggerheart.classes.Item.koq6qy5n7alp7kcb` is the copy in play,
+  `Compendium.the-void-unofficial.classes.Item.PKcnVdqacraEf8uL` the one a sheet
+  built earlier still holds — same rule, same chart, same single action, so
+  `MATCH` lists both and nothing else branches. World setting
   `communeOracle`, **on** by default, filed under Witch in the Classes tab (the
   entry was a bare `fromVoid("Witch")` before this).
   - **The card is half-built, and the half it has is fine.** One `effect` action
@@ -1807,8 +1947,11 @@ loads).
     conversation. "During a moment of calm" is not enforced; nothing on a sheet
     knows whether the moment qualifies. A GM who dismisses the answer box is not
     chased: narrating it aloud is a legitimate answer.
-- **Witch's Charm** (`src/daggerheart/witchs-charm.ts`) — the Void's Witch class
-  feature, `Compendium.the-void-unofficial.classes.Item.uBQT6rw7mFJubv7e`. World
+- **Witch's Charm** (`src/daggerheart/witchs-charm.ts`) — the Witch class
+  feature. Two homes since 2.9.3, like Commune:
+  `Compendium.daggerheart.classes.Item.7nIDpcWOGzO8Y6gq` (SRD, in play) and
+  `Compendium.the-void-unofficial.classes.Item.uBQT6rw7mFJubv7e` (Void) — the
+  SRD reworded "rolls a failure on" to "fails", nothing else moved. World
   setting `witchsCharm`, **on** by default, filed under Witch beside Commune.
   - **What the card ships.** One `effect` action, "Spend Hope", whose only
     content is `cost: [{ key: "hope", value: 3 }]`. `effects` is empty and there
@@ -1856,97 +1999,72 @@ loads).
     them. A multi-target roll that succeeds now hits every target, which costs
     nothing to reason about because it only read as a failure by missing all of
     them.
-- **Hex** (`src/daggerheart/hex.ts`) — the Void's Witch class feature,
-  `Compendium.the-void-unofficial.classes.Item.4iy45CFDxqDrb5QN`: "when a
-  creature causes you or an ally within Close range to mark any number of Hit
-  Points, you can mark a Stress to Hex them. Action and damage rolls against a
-  Hexed creature gain a bonus equal to your tier." World setting `hexCondition`,
-  **on** by default, filed under Witch beside Witch's Charm.
-  - **What the Void ships is right as far as it can go.** One `effect` action,
-    "Mark Stress", charging 1 Stress and applying an embedded ActiveEffect named
-    "Hex" whose `system.changes` is empty. The card is left entirely alone,
-    button and effect both. The empty `changes` is not an oversight: *"a bonus to
-    rolls made against this creature"* is a property of one roll, not of any
-    character, so no ActiveEffect can carry it — the same wall Gifted Tracker
-    documents and for the same reason.
-  - **The trigger needs two seams, because neither half knows the other's
-    answer.** *How many Hit Points were marked* is only settled after
-    `Actor#takeDamage` has run resistances, thresholds and the armour-slot
-    dialog, which is what `daggerheart.postTakeDamage` reports. *Which creature
-    caused it* is not in that hook at all — `takeDamage` is told about damage,
-    never about who threw it — and lives one level up in the action config
-    (`config.source.actor`). So a `before` rule on `damage-landing.ts` writes down
-    who is about to hurt whom, keyed on the actor uuid, and the `postTakeDamage`
-    handler reads it back and deletes it. Entries are swept after a minute rather
-    than seconds: the armour-slot query between the two seams has a thirty-second
-    timeout of its own. Damage nobody applied — a GM typing a Hit Point onto a
-    sheet — has no attacker attached and deliberately raises nothing.
-  - **The bonus needs two more seams, because the system builds the two rolls
-    differently.** Neither writes anything to a sheet: the bonus is recomputed
-    from the hex every time a roll is built, so lifting the hex un-applies it with
-    nothing to reconcile.
-    - **Action rolls** ride `daggerheart.preRoll` into
-      `config.roll.baseModifiers`, which `D20Roll.applyBaseBonus` deep-clones as
-      its first act and `DualityRoll` inherits — so one hook covers an
-      adversary's d20 and a character's Duality roll alike. It has to be that
-      hook and not `postRollConfiguration`: `D20Roll`'s **constructor** calls
-      `constructFormula`, so the formula is already built by the time the later
-      one fires. The entry is labelled, so it shows in the roll dialog and in the
-      card's breakdown rather than arriving as an unexplained number.
-    - **Damage rolls** wrap `DamageRoll.temporaryModifierBuilder` — the system's
-      own bucket for a per-roll bonus that is not an ActiveEffect, where Rally
-      dice, Massive, Brutal and Serrated already live, and which renders in the
-      damage dialog's **Modifiers** fieldset as a ticked checkbox. Wrapping is
-      necessary rather than tidy: that builder ends with `config.modifiers =
-      mods`, replacing the object wholesale, so anything a `preRoll` listener put
-      there is discarded a few lines later. Several hexes collapse into one entry,
-      because the damage is rolled once however many creatures it is aimed at.
-    - `config.roll` is what tells the two apart. `RollField.prepareConfig` builds
-      it with a formula and no total; `buildEvaluate` replaces it with the
-      finished result. A config whose `roll.total` is a number is an evaluated
-      roll being carried into the damage step, and the action-roll hook leaves it
-      alone. Ours are also tagged and stripped before being re-added, so a roll
-      rebuilt or re-configured ends up with one of each rather than two.
+- **Hex** (`src/daggerheart/hex.ts`) — the Witch class feature, Hope and Fear
+  SRD: "Mark a Stress to temporarily Hex a target within Far range. While Hexed,
+  the target gains a penalty to their damage rolls and Difficulty equal to your
+  tier. The maximum number of creatures you can Hex at one time is equal to your
+  Spellcast trait." `Compendium.daggerheart.classes.Item.EFgQVcDiADsKxG3T`;
+  the Void's `Compendium.the-void-unofficial.classes.Item.4iy45CFDxqDrb5QN` is
+  matched too and **gets this rule** — the module implements one Hex and the
+  Void's is retired. World setting `hexCondition`, **on** by default, under
+  **Classes → Witch** in `daggerheartAutomationMenu`.
+  - **A different rule, not a rewording.** The Void's Hex was a reaction (a
+    creature hurts you or an ally within Close → mark a Stress) granting the
+    party a *bonus* against the creature, one per witch, lifted by the GM
+    spending Fear. The first version of this file implemented that: damage-
+    landing attribution, a `postTakeDamage` prompt fan-out, `preRoll` and
+    damage-modifier bonus seams, a Fear button on the announcement card, and
+    the `hexCard` flag. All of it is gone (Daggerheart 2.9.3); `fear.ts` and
+    `damage-modifiers.ts` keep their other consumers.
+  - **The SRD card is nearly complete on its own**, and none of it is
+    reimplemented: one `effect` action "Hex" (1 Stress, `target: any`,
+    `range: far`) applying an embedded effect with three `subtract` changes —
+    `system.difficulty` and `system.bonuses.damage.{physical,magical}.bonus`,
+    each `ORIGIN.@tier`, duration `temporary`. `DhActiveEffect.getChangeValue`
+    resolves `ORIGIN.@…` against the Item the effect's `origin` names (the
+    witch's card, whose roll data is hers), `DamageRoll.getBonus` honours
+    `subtract` as a ticked modifier, and `DhActiveEffect._preCreate` refuses a
+    second effect with the same `origin`, so re-hexing does not stack.
+  - **What the card cannot do (three things), and this does:**
+    1. **Land on an adversary from a player's client.** `EffectsField.applyEffect`
+       is a bare `ActiveEffect.create`. So `stripNativeEffects` empties the
+       action's `effects` at `Item#prepareEmbeddedDocuments` (display-only;
+       `reconcileHexCards` `reset()`s on setting change) and `cast` on
+       `postUseAction` asks `gm-effects.ts` for a `hex` mark instead — whose
+       fixed shape now carries the SRD's three changes and `durationType:
+       "temporary"`, with `originUuid` = the witch's card so `ORIGIN.@tier`
+       resolves. The GM's client checks the origin is an Item embedded in the
+       source actor before using it (see **GM effects** below).
+    2. **The cap.** `refusal` on `preUseAction` — before the Stress is charged —
+       counts effects flagged with the witch's uuid across `game.actors` plus
+       the current scene's token actors (`creaturesHexedBy`), against
+       `system.spellcastModifier`. At or over: refused with a notification
+       naming the cap and the creatures; "maximum", not "replace", so nothing is
+       lifted to make room. A creature already under this witch's hex is let
+       through (refresh, no new count). Spellcast 0 is a cap of 0, as printed.
+    3. **Far range.** The system checks no range against targets.
+       `withinBand(distanceBetweenActors(witch, creature), "far") === false`
+       refuses; **unmeasurable is let through** — unlike Close-Knit's picker,
+       this is a deliberate targeted press, and a GM casting from the sidebar
+       should not be stopped by geometry nobody drew.
   - **The hex lives on the hexed creature** as the `gm-effects.ts` marker,
-    flagged `FLAGS.hex` with the witch's uuid. The effect *is* the record; there
-    is no second copy. This is Tethered Talisman's shape rather than Ranger's
-    Focus's, and the difference is the point: the Focus record has to sit on the
-    ranger because the bonus is the ranger's, while here the bonus belongs to the
-    creature and every roll in the party reads it. Keyed by witch, so two Witches
-    can hex the same adversary and each contributes her own tier — read live off
-    her sheet, so a level-up applies to a hex already standing.
-  - **Ending it is two-thirds automated, and the missing third is deliberate.**
-    Hexing again lifts the previous hex, found by the same `game.actors`-plus-
-    current-scene scan Tethered Talisman uses. The GM's clause is a button on the
-    announcement card, drawn for the GM only, spending Fear equal to the witch's
-    Spellcast trait — read live when it is pressed, because the rule names the
-    trait and not the number it had that evening, and refused with the shortfall
-    named when there is not enough. "Otherwise, remove it when the scene ends" is
-    **not** automated: a Daggerheart scene is a fiction boundary, not a canvas one
-    and not a combat, so hanging it on `canvasReady` or on an encounter ending
-    would invent a rule and silently lift a hex the table still counts. The
-    effect's description says when to remove it; deleting it is one click. Same
-    judgement Gifted Tracker makes about "until you stop tracking them".
-  - **Every eligible witch is asked, and the first yes does not settle it** —
-    unlike Witch's Charm, where one rescue is one rescue. Two Witches each spend
-    their own Stress and place their own hex, and the rule gives neither
-    precedence. The person hurt is asked first when they hold the card, since
-    "you" is the clause with nothing to measure. One attack that hurts three party
-    members reaches the handler three times, concurrently, so the claim on a
-    witch's attention is taken synchronously before the socket call — each witch
-    is asked once per damage application, not once per casualty.
-  - **Deliberate silences.** Damage that marks no Hit Points raises nothing,
-    including a hit that marks only Stress. Nobody hexes their own doing — a
-    creature that hurt itself, and a witch asked about damage she caused, are both
-    skipped. Unmeasurable range means no, as everywhere else here. Reaction rolls
-    gain nothing (they are not action rolls); damage is *not* filtered that way,
-    since "damage rolls against a Hexed creature" is unqualified. Healing never
-    gains it. One damage roll serves every target it hit, so a swing that catches
-    a hexed creature and an unhexed one adds the bonus once, to both — which is
-    the system's own arithmetic, and is why the modifier is left tickable.
-- **Herbal Remedies** (`src/daggerheart/herbal-remedies.ts`) — the Hedge Witch
-  subclass's foundation feature,
-  `Compendium.the-void-unofficial.subclasses.Item.pYtLdnmhKmVtxsIM`. World setting
+    flagged `FLAGS.hex` `{ sourceUuid }`. The effect **is** the record: its
+    changes are the penalty, its count is the cap, deleting it is the end.
+    Keyed by witch, so two Witches can hex one creature and each subtracts her
+    own tier. The announcement names the tier and "N of M Hexes in use", with N
+    counted after the press (the relayed effect may not have landed yet).
+  - **Deliberate silences.** Ending it is by hand — "temporarily" names no
+    moment and the SRD dropped the Fear price and the scene clause; the effect's
+    description says to delete it. Hexing a character penalises only their
+    damage (no Difficulty to reach). A hex on an unlinked token on another
+    scene is not counted toward the cap.
+- **Herbal Remedies** (`src/daggerheart/herbal-remedies.ts`) — the Hedge
+  subclass's foundation feature. Two homes since 2.9.3, like Commune:
+  `Compendium.daggerheart.subclasses.Item.HE0slu6jR0Io2x84` (SRD, in play) and
+  `Compendium.the-void-unofficial.subclasses.Item.pYtLdnmhKmVtxsIM` (Void). The
+  SRD adds "an ally **in the scene**", which is deliberately not enforced — the
+  +1 lands on the drinker's formula and the consumable's own targeting already
+  decides who that can be. World setting
   `herbalRemedies`, **on** by default, filed under Witch in its own
   `HedgeWitchLegend` group (same rule as Beastbound under Ranger).
   - **Nothing is built on the card, and nothing could be.** `actions: {}`,
@@ -2005,25 +2123,65 @@ loads).
     card: the bonus shows as the system's own `+1` modifier chip, and the healing
     is folded into the *action's* existing message, so there is not even a
     document of ours to flag.
-- **Tethered Talisman** (`src/daggerheart/tethered-talisman.ts`) — the Hedge
-  Witch subclass's second feature,
-  `Compendium.the-void-unofficial.subclasses.Item.UeY92YRyTAeTPnam`. World
-  setting `tetheredTalisman`, **on** by default, filed under Witch in the same
-  `HedgeWitchLegend` group as Herbal Remedies.
-  - **What the card already does, and is left doing.** One `effect` action,
-    "Tether": `target: { type: "any" }`, `uses: { max: "1", recovery:
-    "shortRest" }`, `effects: []`. The press, the target and the once-per-rest
-    bookkeeping are all the system's — `UsesField` refuses the second press by
-    itself — so none of it is reimplemented. Only the three things the card can't
-    do are here: imbuing something, asking when the holder is hit, and warning
-    before a second talisman cancels a first.
-  - **No talisman Item.** The talisman is an ActiveEffect on the holder, flagged
+- **Enchanted Talisman** (`src/daggerheart/tethered-talisman.ts`) — the Hedge
+  Witch subclass's second feature: "Once per rest, you can imbue a small item
+  with your protective essence. Spend any number of Hope to place an equal
+  number of tokens on this card. When the person holding the talisman takes
+  damage, spend a token to reduce the number of Hit Points they mark by one.
+  Clear all tokens from this card when you take a rest." Two homes, both
+  matched by source: `Compendium.daggerheart.subclasses.Item.4jnGL4ENGs2AR1p1`
+  (Hope and Fear SRD, Daggerheart 2.9.3) and
+  `Compendium.the-void-unofficial.subclasses.Item.UeY92YRyTAeTPnam` (*Void for
+  Daggerheart*, as **Tethered Talisman** — a different rule: one single-use
+  charm per rest, no tokens). World setting `tetheredTalisman`, **on** by
+  default, filed under Witch in the same `HedgeWitchLegend` group as Herbal
+  Remedies. **The file, setting key, flag and registry id keep the Void's
+  name** — a stored setting and a flag on somebody's sheet can't be renamed
+  without a migration; every string a player sees says the SRD's.
+  - **What the SRD card ships, and why none of it is enough.** `system.resource`
+    — `simple`, no max, `shortRest`, `increasing` — is the token counter, and
+    the system's rest refresh already zeroes it. Its one action, "Spend Hope",
+    is a `healing` action with a scalable Hope cost that heals the card's own
+    resource by `@scale`. But it targets `self` (nobody is named as holder), has
+    no `uses` ("once per rest" unenforced), lands its tokens only when somebody
+    presses Apply on the chat card, and nothing asks anybody when the holder is
+    hit.
+  - **Module wins: the action is replaced, under the native `_id`.**
+    `reshapeTalismanCard` at `Item#prepareEmbeddedDocuments` (the Blighting
+    Strike / Close-Knit seam; display-only; `reconcileTalismanCards` `reset()`s
+    on setting change) swaps in an `effect` action — same scalable Hope cost,
+    `target: any`, `uses: 1 / shortRest`, `chatDisplay: false` — keeping the
+    native action's id. That id is the trick: the system writes `uses.value` to
+    `system.actions.<id>.uses.value` on a press and the rest refresh writes `0`
+    there, so under a native id "once per rest" is entirely the system's,
+    shown on the button and cleared by the same refresh that clears the tokens.
+    A card with no native action or more than one is left as it shipped
+    (`nativeAction`), because a module-owned id would put a half-formed action
+    into source. The system's own cost dialog asks how many Hope.
+  - **Tokens live on the witch's card and nowhere else** — `system.resource.value`,
+    the SRD's own shape, visible and editable on her Features tab. Written by
+    `imbue` on `postUseAction` from `config.costs[hope].total`, directly (the
+    presser owns the card); a Void card without a counter is given the whole
+    `TOKENS` shape on first press (see `slayer.ts` on partial writes into a
+    nullish `SchemaField`). Spent through `modifyResource`'s item-cost path
+    (`{ key: "resource", value: -1, itemId, target }`), which relays via GM —
+    the client applying the damage rarely owns the witch's sheet.
+  - **The holder is an ActiveEffect on the holder**, flagged
     `FLAGS.tetheredTalisman` with the witch's uuid, placed through
-    `gm-effects.ts` (the holder is usually somebody else's character, and core
-    requires OWNER of the parent to create an ActiveEffect). The effect *is* the
-    record — spending it deletes it, deleting it by hand calls the feature off,
-    and its absence is what lets another be imbued. Keyed by *witch*, not holder,
-    so two Hedge Witches can tether the same person.
+    `gm-effects.ts`. It carries no count. Goes when the last token is spent,
+    when the witch imbues again (the previous holder is unmarked first), or when
+    deleted by hand. One left standing after a rest emptied the card is inert
+    and is cleared lazily — the first time `offerTalisman` finds it with no
+    tokens behind it — rather than watched for on a rest hook. Keyed by
+    *witch*, so two Hedge Witches can enchant the same person.
+  - **Readings.** *One token per hit* — "spend a token … by one"; three tokens
+    against one Severe hit is the more generous invention. *Once per rest is
+    the `uses`*, not "until the tokens are gone". *The holder is whoever was
+    targeted when pressed*, exactly one, refused from `preUseAction` before the
+    Hope is charged (`prepareConfig` has already run, so the target is known
+    while the press is still free). The Void's "can't create a new talisman
+    until the old one has been used" clause is gone from the SRD and so is the
+    replacement warning that enforced it.
   - **The reduction is on the marks, not the damage.** Thresholds mean the two
     are not interchangeable: against a Major of 8, 8 damage marks 2 and 7 marks
     1, so the same subtraction is worth a whole Hit Point at one number and
@@ -2040,22 +2198,15 @@ loads).
     who was actually hit.
   - **The witch is asked, not the person hit.** `responderFor(witch)`, falling
     back to the client running the damage when nobody who owns her is connected.
-    Spending the talisman is her decision and the only interesting one in the
-    feature; a player about to mark two Hit Points always says yes.
-  - **Replacing is a warning, not a refusal.** Raised from `preUseAction` —
-    before the use is spent — by returning `false` and replaying the press with
-    `event.eeTetheredTalisman` on a yes, the same cancel-and-replay
-    `rangers-focus.ts` hands to the Target Helper. A synchronous hook cannot
-    await a dialog, and asking after the use would be asking after the cost. The
-    no-target refusal is raised there too, for the same reason: `prepareConfig`
-    has already run when `preUseAction` fires, so the target is known while the
-    press is still free.
+    The hint says how many tokens are left; the re-read after the answer checks
+    both the effect and the count.
   - **Deliberate silences.** A hit that marks no Hit Points raises no prompt and
     spends nothing. Stress is never reduced, and a Stress-only hit does not ask.
-    Direct damage is included — it bypasses armor, not talismans. The world scan
-    for an outstanding talisman covers `game.actors` plus the current scene's
-    unlinked token actors; one on an unlinked token on another scene is not
-    found, and the only cost is a warning that stays quiet.
+    Direct damage is included — it bypasses armor, not talismans. Nothing is
+    refunded when the rest clears unused tokens. The world scan for an
+    outstanding talisman covers `game.actors` plus the current scene's unlinked
+    token actors; one on an unlinked token on another scene is not found on a
+    re-imbue and is cleared lazily instead.
 - **Companion** (`src/daggerheart/companion.ts`) — the Beastbound subclass's
   foundation card, made pressable. World setting `companionCommands`, **on** by
   default, filed under Ranger with its own `BeastboundLegend` group (same rule as
@@ -2134,9 +2285,44 @@ loads).
     neither a target nor a difficulty — the Command roll's normal case — so only
     an explicit `false` stands the note down.
 - **Close-Knit** (`src/daggerheart/close-knit.ts`) — the Hearthborne community's
-  (*Void for Daggerheart*) "Once per long rest, you can spend any number of Hope
-  to give an ally the same number of Hope." World setting `closeKnitShareHope`,
-  **on** by default, filed under Hearthborne in the Communities tab.
+  "Once per long rest, you can spend any number of Hope to grant an ally within
+  Far range an equal number of Hope." World setting `closeKnitShareHope`, **on**
+  by default, filed under Hearthborne in the Communities tab.
+  - **Two homes since Daggerheart 2.9.3, one button.** The Hope and Fear SRD
+    absorbed the Hearthborne, and its Close-Knit
+    (`Compendium.daggerheart.communities.Item.u5OSsvjcD8tvf5Gc`) ships a
+    `healing` action of its own, "Give Hope": scalable Hope cost, `@scale`
+    formula, `range: far`, `uses: 1 / longRest` on the card. Beside ours that is
+    a second button for one rule with a second once-per-rest count, so
+    `stripNativeActions` **removes the native action at preparation time** and
+    ours is the one left — the same reversible seam `blighting-strike.ts` uses to
+    remove its card's two damage actions; `reconcileCloseKnitCards` therefore
+    `reset()`s the document (not just re-injects) so turning the setting off
+    brings the native action back. The Void's copy
+    (`…the-void-unofficial.communities.Item.lTJoENAJIjB8zgB7`) has `actions: {}`
+    and is unaffected. `COMPENDIUM_SOURCES` lists both.
+    - **Module over native was the GM's call, on the strength of the picker.** A
+      `healing` action wants the recipient's token *targeted* on the canvas; the
+      picker offers every ally by name. The cost is the native `uses`, which is
+      why the rest limit stays an ActiveEffect. (The first cut went the other
+      way — withhold ours when a native action exists — and was reversed the
+      same day; both directions are one guard in `injectCloseKnitAction`.)
+    - Read off the prepared collection rather than `_source`, so a native
+      action a homebrew *adds* to a Void copy is stripped the same way.
+  - **"…within Far range" is enforced, and it is the SRD's one rule change.**
+    `allies()` sorts every candidate through `range-bands.ts` —
+    `withinBand(distanceBetweenActors(giver, ally), "far")` — into `inRange`
+    (offered), `outOfRange` (named under the question so the player sees the
+    friend and *why* they can't be picked) and `unmeasured` (no canvas, or one
+    of the two has no token on this scene — also not offered, named separately).
+    Unmeasured-means-no is the strict reading `witchs-charm.ts` already takes
+    for the same phrase; the GM confirmed tokens are on the scene at this table,
+    so in practice it is the sheet-opened-from-the-directory case. `refusal()`
+    has three absences to name: `NoAlly` (nobody at all), `NoRange` (the giver
+    is off the scene, so nothing measures) and `NoAllyInRange` (measured, too
+    far). The derived action also carries `range: "far"` so the sheet prints it
+    — informational only, since the action declares no targets for the system
+    to check against.
   - **The Void ships nothing** — `featureForm: "passive"`, `resource: null`,
     `actions: {}`. Worth knowing *why*, because two of the card's three clauses
     are natively expressible and the SRD uses both: "spend any number of Hope" is
@@ -2212,17 +2398,31 @@ loads).
     all. The headroom is shown while choosing and the overspill is said out loud
     afterwards rather than silently swallowed.
 - **Brave Face** (`src/daggerheart/brave-face.ts`) — the Warborne community's
-  (*Void for Daggerheart*) "Once per session, when an attack would cause you to
-  mark a Stress, you can spend a Hope instead."
-  `Compendium.the-void-unofficial.communities.Item.KrqCfjp4E1r10XQr`, shipped as
-  description only — no action, no resource, no effect. World setting
-  `braveFace`, **on** by default, filed under Warborne in the Communities tab.
+  "Once per session when you would be forced to mark a Stress, you can spend a
+  Hope instead." Two homes, both matched by source:
+  `Compendium.daggerheart.communities.Item.E7QiHAoOxQIZEVR1` (Hope and Fear SRD,
+  Daggerheart 2.9.3) and
+  `Compendium.the-void-unofficial.communities.Item.KrqCfjp4E1r10XQr` (*Void for
+  Daggerheart*, where it was written against — that copy read "when an attack
+  would cause you to mark a Stress"). World setting `braveFace`, **on** by
+  default, filed under Warborne in the Communities tab.
   - **There is nothing to press, and that is correct.** The rule has no moment a
     player could press it *at*: it fires inside somebody else's attack, after the
-    damage is worked out and before the sheet is written. So this is the first
-    feature here with no card takeover of any kind — one rule on
-    `damage-marking.ts` and one on `damage-landing.ts`, and the card is left
-    exactly as the Void ships it.
+    damage is worked out and before the sheet is written. One rule on
+    `damage-marking.ts` and one on `damage-landing.ts`; the Void's card, which
+    ships as description only, is left exactly as it is.
+  - **The SRD's card ships a button anyway, and it is stripped.** "Spend Hope"
+    is an `effect` action — cost 1 Hope, `uses: 1 / session`, no effects — that
+    takes the Hope, posts a card, ticks its own counter and does nothing about
+    the Stress: no action can reach into a damage packet being applied to its
+    owner. A receipt, not the rule, and beside the interception it would be a
+    second once-per-session counter and a second way to spend the same Hope on
+    the same hit. `stripNativeActions` removes every action from the prepared
+    collection at `Item#prepareEmbeddedDocuments` — the Blighting Strike /
+    Close-Knit seam, display-only, and `resetBraveFaceCards` (every client, on
+    setting change) `reset()`s the documents so the button comes back when the
+    setting goes off. Its `uses` counter goes with it, which is what leaves one
+    counter rather than two.
   - **The Stress is never marked, rather than marked and cleared**, and that is
     the whole reason the seam is where it is. `Actor#convertStressDamageToHP`
     turns an unmarkable Stress into a Hit Point, and it runs *inside*
@@ -2252,21 +2452,24 @@ loads).
     raises no prompt. That recording is also what keeps `wants` from interposing
     on the overwhelming majority of hits — 42 of the SRD's adversary actions
     carry a Stress damage part, and nothing else does.
-  - **"An attack" is read as an action's damage landing on you**, deliberately
-    not narrowed to actions that made an attack roll: an environment's damage is
-    an attack to everyone at the table, and narrowing would fail *silently* — the
-    offer simply would not appear. The cost of the wide reading is an offer that
-    can be declined. **"A Stress" is one**; an attack marking two leaves one
-    marked, since taking the lot for a single Hope would be the more generous
-    invention.
+  - **"Forced to mark a Stress" is read as an action's damage landing on you**,
+    deliberately not narrowed to actions that made an attack roll: an
+    environment's damage forces the Stress as much as an adversary's, and
+    narrowing would fail *silently* — the offer simply would not appear. The
+    Void's "an attack" wording was read the same wide way, so the SRD's rewording
+    changed nothing here. The cost of the wide reading is an offer that can be
+    declined. **"A Stress" is one**; an attack marking two leaves one marked,
+    since taking the lot for a single Hope would be the more generous invention.
   - **The person hit is the one asked**, which is the only reaction here that
     goes to them rather than to somebody watching — the Stress is theirs to take
     and the Hope theirs to spend, so there is no third party with an interest.
   - **Deliberate silences.** Stress from pressing your own card, typed onto a
     sheet by the GM, or applied by a macro that never went through `applyDamage`
-    raises nothing. Healing is skipped first. A `fullRestore` entry ("mark all
-    your Stress") is left alone — a different rule with a different arithmetic.
-    The use is neither refunded nor consumed on a decline.
+    raises nothing — a GM narrating "mark a Stress" and reaching for the sheet is
+    forcing one in exactly the SRD's sense, and there is no seam in a hand edit
+    to ask from. Healing is skipped first. A `fullRestore` entry ("mark all your
+    Stress") is left alone — a different rule with a different arithmetic. The
+    use is neither refunded nor consumed on a decline.
 - **Not Good Enough** (`src/daggerheart/not-good-enough.ts`) — the Blade domain's
   (SRD level 1) "When you roll your damage dice, you can reroll any 1s or 2s."
   Two settings: world `notGoodEnoughReroll`, **on** by default, filed under Blade
@@ -2713,7 +2916,8 @@ loads).
   and go through `Actor#modifyResource`, Fear is a **world-scoped game setting**
   the system owns — which is the whole reason this is a file. Extracted from
   `hex.ts` ("spends a number of Fear equal to your Spellcast trait") when
-  `slumber.ts` arrived ("spends a Fear on their turn"). The setting *name* is read
+  `slumber.ts` arrived ("spends a Fear on their turn"); the SRD's Hex no longer
+  spends Fear, so Slumber is now its only consumer. The setting *name* is read
   from `CONFIG.DH.SETTINGS.gameSettings.Resources.Fear` with `"ResourcesFear"` as
   the fallback: a wrong key would silently read zero forever, which looks exactly
   like a table that has spent it all. `spendFear` **re-reads the pool immediately
@@ -3125,7 +3329,7 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
     Patterns under Wizard, Face Your Fear under Wizard,
     Attack of Opportunity and
     Slayer under Warrior, Commune, Witch's Charm, Hex, Herbal Remedies and
-    Tethered Talisman under Witch). A subclass
+    Enchanted Talisman under Witch). A subclass
     has no home of
     its own, so its rules are filed under its parent class in a group of their own — Hybrid Form under
     Blood Hunter, Beastbound under Ranger, Slayer (Call of the Slayer) under

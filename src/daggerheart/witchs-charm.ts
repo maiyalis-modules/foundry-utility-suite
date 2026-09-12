@@ -1,11 +1,14 @@
 /**
- * **Witch's Charm** (Witch class, *Void for Daggerheart*) — "When you or an ally
- * within Far range rolls a failure on an action roll, you can spend 3 Hope to
- * change it into a success with Fear instead."
+ * **Witch's Charm** (Witch class — Hope and Fear SRD, previously *Void for
+ * Daggerheart*) — "When you or an ally within Far range fails an action roll,
+ * you can spend 3 Hope to change it into a success with Fear instead."
  *
- * `Compendium.the-void-unofficial.classes.Item.uBQT6rw7mFJubv7e`, a `feature`
- * Item carrying one `effect` action, "Spend Hope". That action does exactly one
- * thing: charge 3 Hope. Its `effects` list is empty, so nothing is converted —
+ * `Compendium.daggerheart.classes.Item.7nIDpcWOGzO8Y6gq` since Daggerheart
+ * 2.9.3, and `Compendium.the-void-unofficial.classes.Item.uBQT6rw7mFJubv7e`
+ * before it — the same card in both, down to the shape: a `feature` Item
+ * carrying one `effect` action, "Spend Hope". (The Void's wording was "rolls a
+ * failure on an action roll"; the rule is unchanged.) That action does exactly
+ * one thing: charge 3 Hope. Its `effects` list is empty, so nothing is converted —
  * and it cannot be, because by the time anyone could press it the roll it is
  * about is already on the table. The card takes the price and leaves the table to
  * rewrite the result by hand, which means walking back the Hope the roller has
@@ -124,9 +127,16 @@ const FEATURE_ID = "witchsCharm";
 /** Prefix for this feature's console lines. */
 const LABEL = "Witch's Charm";
 
-/** How the granting card is recognised — flag, then compendium, then name. */
+/**
+ * How the granting card is recognised — flag, then compendium, then name. Both
+ * homes of the card are listed (see the header); SRD first only because that is
+ * the copy in play, since `findGrantingItem` stops at the first hit either way.
+ */
 const MATCH: FeatureMatch = {
-  compendiumSources: ["Compendium.the-void-unofficial.classes.Item.uBQT6rw7mFJubv7e"],
+  compendiumSources: [
+    "Compendium.daggerheart.classes.Item.7nIDpcWOGzO8Y6gq",
+    "Compendium.the-void-unofficial.classes.Item.uBQT6rw7mFJubv7e",
+  ],
   names: ["Witch's Charm"],
 };
 

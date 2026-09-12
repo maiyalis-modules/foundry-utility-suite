@@ -13,6 +13,7 @@ import {
   DECK_CARD_TYPES,
   DEFAULT_DECK_LIMIT,
 } from "../daggerheart/deck-limit.js";
+import { voidActive } from "../integrations/void-shared.js";
 import { ConfigWindow } from "./config-window.js";
 
 export class DaggerheartUtilitiesConfig extends ConfigWindow {
@@ -33,6 +34,7 @@ export class DaggerheartUtilitiesConfig extends ConfigWindow {
 
   protected override settingKeys = [
     SETTINGS.relayActionEffects,
+    SETTINGS.hideVoidDeprecatedContent,
     SETTINGS.deckLimitEnabled,
     SETTINGS.deckLimitPlayersOnly,
   ] as const;
@@ -44,6 +46,13 @@ export class DaggerheartUtilitiesConfig extends ConfigWindow {
     return {
       ...context,
       relayActionEffects: DaggerheartUtilitiesConfig.flag(SETTINGS.relayActionEffects),
+      hideVoidDeprecatedContent: DaggerheartUtilitiesConfig.flag(
+        SETTINGS.hideVoidDeprecatedContent,
+      ),
+      // Drives the "install The Void to use this" note, and the greying in
+      // refreshControls — the switch governs one module's compendiums and does
+      // nothing at all without it.
+      voidActive: voidActive(),
       deckLimitEnabled: DaggerheartUtilitiesConfig.flag(SETTINGS.deckLimitEnabled),
       deckLimitCount: DaggerheartUtilitiesConfig.count(SETTINGS.deckLimitCount, DEFAULT_DECK_LIMIT),
       deckLimitPlayersOnly: DaggerheartUtilitiesConfig.flag(SETTINGS.deckLimitPlayersOnly),
@@ -60,8 +69,19 @@ export class DaggerheartUtilitiesConfig extends ConfigWindow {
   /**
    * Grey out everything the switch governs — the deck count and every
    * copies-per-deck field, which are just as meaningless while it's off.
+   *
+   * The Void switch is greyed on a different basis: not on another control, but
+   * on whether that module is installed at all. Disabled rather than hidden, so
+   * a GM who has turned Void off temporarily can still see the setting is there
+   * — and it's the same reason its `<optgroup>`s are disabled rather than
+   * dropped in the Automation window.
    */
   protected override refreshControls(root: HTMLElement): void {
+    const voidSwitch = root.querySelector<HTMLInputElement>(
+      `input[name='${SETTINGS.hideVoidDeprecatedContent}']`,
+    );
+    if (voidSwitch) voidSwitch.disabled = !voidActive();
+
     const master = root.querySelector<HTMLInputElement>(
       `input[name='${SETTINGS.deckLimitEnabled}']`,
     );

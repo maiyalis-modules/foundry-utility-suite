@@ -54,6 +54,7 @@ import { registerViciousEntangle } from "./daggerheart/vicious-entangle.js";
 import { registerHotbarPages } from "./hotbar/hotbar-pages.js";
 import { registerGinzzzuPortraits } from "./integrations/ginzzzu-portraits.js";
 import { registerQuickActionsRollRequest } from "./integrations/quickactions-roll-request.js";
+import { registerVoidDeprecatedContent } from "./integrations/void-deprecated-content.js";
 import { registerVoidHybridForm } from "./integrations/void-hybrid-form.js";
 import { registerVoidHybridFormStressEnd } from "./integrations/void-hybrid-form-stress.js";
 import { registerSessionLog } from "./session-log/session-log-events.js";
@@ -212,11 +213,9 @@ Hooks.once("init", async () => {
   // worth anything because of `registerHiddenCondition` below, but neither one
   // reads the other — they meet on the token, not in this list.
   registerMysteriousMist();
-  // A rule rather than a card, and the second listener this module puts on
-  // `daggerheart.preRoll` — the other is Hex's. Their order does not matter:
-  // that one pushes onto `roll.baseModifiers` and this one sets the two loose
-  // advantage flags the system resolves a line later, so neither can see or
-  // overwrite the other's work.
+  // A rule rather than a card, and the one listener this module puts on
+  // `daggerheart.preRoll` now that the SRD's Hex no longer needs one: it sets
+  // the two loose advantage flags the system resolves a line later.
   registerHiddenCondition();
   // Not a roll window either, and not a card that can be pressed at all: a
   // passive rule that raises a consumable's healing formula before it is rolled.
@@ -232,12 +231,9 @@ Hooks.once("init", async () => {
   // already reduced — which matters in exactly one direction, since a hit the
   // talisman softened still marks whatever Stress it came with.
   registerBraveFace();
-  // Not a roll window either, and its two halves sit on either side of the one
-  // above: a rule on the shared `applyDamage` wrapper notes who is about to hurt
-  // whom, and `postTakeDamage` then asks whether to hex them — which is *after*
-  // the talisman has had its say, so a hit the talisman reduced to nothing marks
-  // no Hit Points and raises no prompt. Before `registerDamageLanding` for the
-  // same reason as everything else that registers a rule with it.
+  // A card reshape and two `use` hooks: the SRD card carries its own penalty
+  // effect, and this only gets it onto an adversary (through the GM relay) and
+  // enforces the range and the Spellcast-trait cap before the Stress is charged.
   registerHex();
   // The single wrapper behind every rule that fires when damage lands. After the
   // features, so every rule they register is already listed — though the patch
@@ -258,6 +254,13 @@ Hooks.once("init", async () => {
   // though the patch itself waits for `setup`, so the order is only tidiness.
   registerCardTargeting();
   // Third-party integrations: each hooks nothing unless its module is active.
+  //
+  // The content filter first, and `init` is not optional for it: `Game#setupGame`
+  // builds every compendium's directory tree *before* the `setup` hook, so a
+  // patch applied any later would leave those trees already built from the
+  // unfiltered list. It reads its own setting, which `registerSettings()` at the
+  // top of this hook has already registered.
+  registerVoidDeprecatedContent();
   registerVoidHybridForm();
   registerVoidHybridFormStressEnd();
   registerGinzzzuPortraits();

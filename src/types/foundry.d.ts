@@ -16,6 +16,37 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   type AnyObject = Record<string, any>;
 
+  /**
+   * A compendium pack (`CompendiumCollection`). Only the members this module
+   * touches.
+   *
+   * `index` is the cheap half of a pack: core fills it synchronously in the
+   * collection's constructor from world data, and it carries the
+   * `compendiumIndexFields` — `_id`, `name`, `img`, `type`, `sort`, `folder` for
+   * both Item and Actor packs — so `name`/`type` questions need no document load
+   * and no `await`. Only *top-level* documents appear; an Item embedded in a
+   * compendium Actor does not.
+   */
+  interface CompendiumPack {
+    /** `{ id, name, label, type, packageType: "system"|"module"|"world", packageName }`. */
+    metadata: AnyObject;
+    /** `"<package>.<name>"` — the id a document's `pack` property carries. */
+    collection: string;
+    index: Iterable<AnyObject> & { get(id: string): AnyObject | undefined } & AnyObject;
+    /**
+     * Re-fetch the index, merging any extra dotted `fields` into the entries
+     * already in {@link index} — the only way to get at a field the server
+     * didn't send at startup, since it builds the initial index knowing nothing
+     * of client `CONFIG`. Core records which fields it has fetched, so asking
+     * twice for the same set is free and every later read is synchronous.
+     */
+    getIndex(options?: { fields?: string[] }): Promise<AnyObject>;
+    /** Re-derive this pack's sidebar directory tree from its visible contents. */
+    initializeTree(): void;
+    /** Core's fan-out to every application registered against this collection. */
+    render(force?: boolean, options?: AnyObject): void;
+  }
+
   /** Loose stand-in for jQuery — some classic Foundry hooks still pass it. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   type JQuery = any;
@@ -173,6 +204,13 @@ declare global {
     messages?: {
       contents: AnyObject[];
       get(id: string): AnyObject | undefined;
+    } & AnyObject;
+    /**
+     * Every compendium pack, keyed by `"<package>.<name>"`. Populated during
+     * `Game#setupGame` — before the `setup` hook — and iterable directly.
+     */
+    packs: Iterable<CompendiumPack> & {
+      get(id: string): CompendiumPack | undefined;
     } & AnyObject;
     /** Every sidebar folder in the world, across all document types. */
     folders?: {

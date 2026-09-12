@@ -444,20 +444,18 @@ export const SETTINGS = {
    */
   witchsCharm: "witchsCharm",
   /**
-   * Master switch for **Hex** (Witch, *Void for Daggerheart*): when a creature
-   * makes a character within Close range mark Hit Points, a witch holding the
-   * card is asked whether to mark a Stress to Hex it — after which every action
-   * and damage roll aimed at that creature gains her tier, until the GM spends
-   * Fear to lift it or she hexes something else. See `daggerheart/hex.ts`.
+   * Master switch for **Hex** (Witch, Hope and Fear SRD): the card's button —
+   * mark a Stress, target within Far — places the card's own penalty effect on
+   * the target through the GM relay, and the module enforces the Far range and
+   * the Spellcast-trait cap before the Stress is charged. See
+   * `daggerheart/hex.ts`.
    *
-   * World-scoped and **on** by default. World scope is the only coherent answer:
-   * the bonus is added while a roll is being built, on whichever client is
-   * making it, so a per-user preference would have the same attack hit at two
-   * different numbers depending on who threw it. Switching it off leaves the
-   * card's own "Mark Stress" button doing exactly what the Void ships — marking
-   * the Stress and placing a label with no `changes` on it — which is the manual
-   * fallback either way, and leaves any hex already standing as an inert marker
-   * to be deleted by hand.
+   * World-scoped and **on** by default, like the other card reshapes: the
+   * action's native effect is stripped as documents are prepared, and two
+   * clients disagreeing would have one applying it natively and the other
+   * through the relay. Switching it off leaves the card exactly as the SRD
+   * ships it — which from a player's client cannot place its effect on an
+   * adversary at all — and any hex already standing as the real effect it is.
    */
   hexCondition: "hexCondition",
   /**
@@ -474,10 +472,11 @@ export const SETTINGS = {
    */
   herbalRemedies: "herbalRemedies",
   /**
-   * Master switch for **Tethered Talisman** (Hedge Witch, *Void for
-   * Daggerheart*): the card's "Tether" action imbues a target with a talisman
-   * effect, and when that person marks Hit Points the witch is asked whether to
-   * expend it for one fewer. See `daggerheart/tethered-talisman.ts`.
+   * Master switch for **Enchanted Talisman** (Hedge Witch, Hope and Fear SRD;
+   * the Void's *Tethered Talisman*, whose name the key keeps): the card's button
+   * spends Hope for tokens and puts a talisman effect on a target, and when that
+   * person marks Hit Points the witch is asked whether to spend a token for one
+   * fewer. See `daggerheart/tethered-talisman.ts`.
    *
    * World-scoped and **on** by default. World scope is the only coherent answer
    * here for the same reason as {@link SETTINGS.herbalRemedies} and more so: the
@@ -640,6 +639,22 @@ export const SETTINGS = {
    * where every `character` actor in the world draws from the decks.
    */
   deckLimitPlayersOnly: "deckLimitPlayersOnly",
+  /**
+   * Hide the compendium content **The Void (Unofficial)** duplicates from the
+   * Daggerheart SRD, now that Hope and Fear has absorbed its Witch, Warlock,
+   * Assassin and Brawler, its Dread domain, and its ancestries, communities,
+   * environments and most of its adversaries.
+   *
+   * World-scoped: which cards exist is a table-wide fact, not a per-client
+   * preference, and a player picking from a list the GM has already pruned is the
+   * whole point. Off by default — it changes what everyone can see, so the GM
+   * opts in.
+   *
+   * Display-only, and reversible at any time: see
+   * `integrations/void-deprecated-content.ts` for what it filters and why the
+   * duplicate set is derived at runtime rather than listed here.
+   */
+  hideVoidDeprecatedContent: "hideVoidDeprecatedContent",
   /**
    * Copies of each Domain card one deck contains. This and its four siblings
    * below describe the *shape* of a deck rather than switching anything on, so
@@ -855,34 +870,17 @@ export const FLAGS = {
    * creature: `{ sourceUuid }`, naming the witch.
    *
    * The effect *is* the condition — there is no second record anywhere. Its
-   * presence is what every action and damage roll aimed at that creature reads
-   * to find the bonus, its absence is what lets another be laid, and deleting it
-   * from the sheet is the "remove it when the scene ends" the rule leaves to the
-   * table. Written by the GM's client on request (see `daggerheart/gm-effects.ts`),
-   * because the creature hexed is almost always an adversary.
+   * `changes` are the penalty (the SRD card's own three, fixed in
+   * `daggerheart/gm-effects.ts`, resolving `ORIGIN.` against the witch's
+   * card), its count against the witch's uuid is the Spellcast-trait cap, and
+   * deleting it from the sheet is how it ends. Written by the GM's client on
+   * request, because the creature hexed is almost always an adversary.
    *
    * Keyed by the *witch* rather than the creature, for the same reason as
-   * {@link FLAGS.tetheredTalisman}: one hex per witch is the rule, and two
-   * Witches can hex the same adversary — each contributing her own tier.
-   *
-   * Deliberately carries no `changes`. "A bonus to rolls made *against* this
-   * creature" is a property of one roll, not of the creature, which is exactly
-   * why {@link FLAGS.giftedTracker} carries none either.
+   * { FLAGS.tetheredTalisman}: the cap is hers, and two Witches can hex
+   * the same adversary — each subtracting her own tier.
    */
   hex: "hex",
-  /**
-   * The **Hex** announcement card: `{ witchUuid, witchName, creatureUuid,
-   * creatureName }`, which is what the GM's "spend Fear to lift it" button acts
-   * on.
-   *
-   * A separate key from {@link FLAGS.hex} because it means a different thing on a
-   * different document — one is the condition, the other is a message about it.
-   * The names are stored only so the card still reads correctly when the actors
-   * behind it are gone; everything the button *acts* on is re-resolved from the
-   * uuids at the moment it is pressed, including the Spellcast trait that sets
-   * the price.
-   */
-  hexCard: "hexCard",
   /**
    * Marks an ActiveEffect as one **Gifted Tracker** tracking, and records what is
    * being tracked: `{ description, hope, quarry: [{ uuid, name, img }] }`.

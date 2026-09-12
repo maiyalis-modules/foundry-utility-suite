@@ -18,6 +18,25 @@
     </div>
   </fieldset>
 
+  {{!-- Governs another module's compendiums, so the switch is disabled (from
+       refreshControls) and a note replaces the hint when The Void isn't active. --}}
+  <fieldset>
+    <legend>{{localize "EE.Utilities.VoidContentLegend"}}</legend>
+
+    <div class="form-group">
+      <label for="ee-hide-void-deprecated">{{localize "EE.Settings.HideVoidDeprecatedContent.Name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" id="ee-hide-void-deprecated" name="hideVoidDeprecatedContent"
+               {{#if hideVoidDeprecatedContent}}checked{{/if}}>
+      </div>
+      {{#if voidActive}}
+      <p class="hint">{{localize "EE.Settings.HideVoidDeprecatedContent.Hint"}}</p>
+      {{else}}
+      <p class="hint">{{localize "EE.Settings.HideVoidDeprecatedContent.Inactive"}}</p>
+      {{/if}}
+    </div>
+  </fieldset>
+
   <fieldset>
     <legend>{{localize "EE.Utilities.DeckLimitLegend"}}</legend>
 

@@ -1,6 +1,27 @@
 /**
- * **Close-Knit** (Hearthborne community, *Void for Daggerheart*) — "Once per long
- * rest, you can spend any number of Hope to give an ally the same number of Hope."
+ * **Close-Knit** (Hearthborne community — Hope and Fear SRD, previously *Void for
+ * Daggerheart*) — "Once per long rest, you can spend any number of Hope to grant
+ * an ally within Far range an equal number of Hope."
+ *
+ * ## Two cards, one button
+ *
+ * The Hope and Fear SRD absorbed the Hearthborne in Daggerheart 2.9.3, and its
+ * Close-Knit ships a `healing` action of its own, "Give Hope": a scalable Hope
+ * cost, a `@scale` formula so what is spent is what is granted, `range: far` for
+ * the SRD's new limit, `uses: 1 / longRest` on the card. Beside the derived
+ * action below that is a second button for one rule, with a second once-per-rest
+ * count that never hears about the first. So on that card the native action is
+ * **removed at preparation time** (`stripNativeActions`) and ours is the one
+ * left standing — the GM's call, made on the strength of the picker: a `healing`
+ * action wants the recipient's token *targeted* on the canvas, where the picker
+ * offers every ally by name, measures Far range itself, and says who fell
+ * outside it. Display-only and reversible; turn the setting off and the native
+ * action is back. The cost is the native `uses`, which is why the rest limit
+ * stays an ActiveEffect (below).
+ *
+ * The rule text below is the SRD's. The Void's card said "give an ally the same
+ * number of Hope" with no range at all; the Far-range check in {@link allies} is
+ * the one thing the SRD changed, and it applies to both copies now.
  *
  * ## What the Void ships, and why "just add an action" doesn't finish it
  *
@@ -22,9 +43,8 @@
  * means declaring a target, targeting a token on the canvas, and passing through
  * `DamageField.execute`'s damage-roll dialog on the way to
  * `applyDamage`. That is a lot of apparatus for "hand a friend two Hope", and it
- * fails outright for an ally who has no token on the current scene — which at
- * this table is most of the time. So the Void's author left the card as prose,
- * and that is a defensible place to stop.
+ * fails outright for an ally who has no token on the current scene. So the
+ * Void's author left the card as prose, and that is a defensible place to stop.
  *
  * ## What this does instead
  *
@@ -79,8 +99,9 @@
  *
  * **Who counts as an ally.** The list is every other character the table can see —
  * the ones assigned to a player, plus any character standing on the current scene
- * — and the player picks from it. Nothing here judges whether the two are on good
- * terms, or in the same room.
+ * — within Far range of the giver, and the player picks from it. Range is the
+ * one thing judged (see {@link allies} for how, and what an unmeasurable one
+ * means); nothing here judges whether the two are on good terms.
  *
  * **Hope that has nowhere to go.** `modifyResource` clamps to the recipient's
  * maximum, so giving 3 to an ally with room for 1 hands over 1 and spends all 3.
@@ -92,6 +113,7 @@
 import { FLAGS, LOG_PREFIX, MODULE_ID, SETTINGS } from "../constants.js";
 import { escapeHtml } from "../utils/escape-html.js";
 import { chooseFromList, chooseOne, type PromptOption } from "./feature-prompt.js";
+import { distanceBetweenActors, withinBand, type RangeBand } from "./range-bands.js";
 
 /** Registry id, for the homebrew `flags.eryndor-essentials.featureId` escape hatch. */
 const FEATURE_ID = "closeKnit";
@@ -99,8 +121,16 @@ const FEATURE_ID = "closeKnit";
 /** For console lines. Deliberately the printed card name. */
 const LABEL = "Close-Knit";
 
-/** The Void Item this comes from — matched ahead of the printed name. */
-const COMPENDIUM_SOURCE = "Compendium.the-void-unofficial.communities.Item.lTJoENAJIjB8zgB7";
+/**
+ * The Items this comes from — matched ahead of the printed name. Two homes since
+ * the Hope and Fear SRD absorbed the Hearthborne (Daggerheart 2.9.3): the SRD's
+ * copy, and the Void's for a sheet built before it. Both get the derived action;
+ * the SRD's loses its own — see `stripNativeActions`.
+ */
+const COMPENDIUM_SOURCES: readonly string[] = [
+  "Compendium.daggerheart.communities.Item.u5OSsvjcD8tvf5Gc",
+  "Compendium.the-void-unofficial.communities.Item.lTJoENAJIjB8zgB7",
+];
 
 /** Fallback identification when the card came from somewhere else. */
 const PRINTED_NAME = "close-knit";
@@ -110,6 +140,9 @@ const ACTION_ID = "eeCloseKnitGive1";
 
 /** The resource this card moves, both ways. */
 const HOPE = "hope";
+
+/** "…an ally within **Far** range." The SRD's addition; the Void's card had none. */
+const BAND: RangeBand = "far";
 
 /** `CONFIG.DH.EFFECTS.activeEffectDurations.longRest.id` — the card's own wording. */
 const UNTIL_LONG_REST = "longRest";
@@ -152,7 +185,7 @@ function isCloseKnitCard(item: AnyObject | null | undefined): boolean {
   const flagged = item["flags"]?.[MODULE_ID]?.[FLAGS.featureId];
   if (typeof flagged === "string" && flagged.trim() === FEATURE_ID) return true;
 
-  if (text(item["_stats"]?.["compendiumSource"]) === COMPENDIUM_SOURCE) return true;
+  if (COMPENDIUM_SOURCES.includes(text(item["_stats"]?.["compendiumSource"]))) return true;
 
   return text(item["name"]).toLowerCase() === PRINTED_NAME;
 }
@@ -229,6 +262,11 @@ function buildAction(item: AnyObject): AnyObject | null {
       // `companion.ts` for the same fallback and the same reason.
       effects: [],
       target: { type: null, amount: null },
+      // The card's own range, so the sheet prints it beside the action the way it
+      // does for every native one. Informational here — the system checks range
+      // against *targets*, and this action declares none; {@link allies} does the
+      // measuring instead.
+      range: BAND,
     },
     { parent: item["system"] },
   );
@@ -247,6 +285,36 @@ function buildAction(item: AnyObject): AnyObject | null {
 }
 
 /**
+ * Take the card's own actions off the prepared collection, leaving only ours.
+ *
+ * The SRD's Close-Knit (Daggerheart 2.9.3, `daggerheart.communities`) ships a
+ * `healing` action of its own, "Give Hope": a scalable Hope cost with a `@scale`
+ * formula, `range: far`, `uses: 1 / longRest` on the card. Beside ours it is a
+ * second button for the same rule, and the two would keep separate once-per-rest
+ * counts. One of them has to go, and it is the native one — the GM's call, made
+ * on the strength of the picker: a `healing` action needs the recipient's token
+ * *targeted* on the canvas, where ours offers every ally in range by name and
+ * measures the range itself (see {@link allies}). The cost of the choice is the
+ * native `uses`, which is why the rest limit below stays an ActiveEffect.
+ *
+ * Display-only, and the same seam `blighting-strike.ts` uses to remove its
+ * card's two damage actions: the collection is derived from `_source` at
+ * preparation and nothing is written back, so `reset()` — which
+ * {@link reconcileCloseKnitCards} calls — restores the native action the moment
+ * the setting is turned off. The Void's card has `actions: {}`, so there this is
+ * a no-op; a native action a homebrew *adds* to that card is treated the same
+ * way as the SRD's, which is why this reads the collection and not `_source`.
+ */
+function stripNativeActions(actions: AnyObject): void {
+  const foreign: string[] = [];
+  for (const action of actions as Iterable<AnyObject>) {
+    const id = String(action?.["_id"] ?? "");
+    if (id && id !== ACTION_ID) foreign.push(id);
+  }
+  for (const id of foreign) actions["delete"]?.(id);
+}
+
+/**
  * Put the action on the card, if it should have one. Called after every
  * preparation of every Item, so the first line is the hot path.
  */
@@ -259,11 +327,15 @@ export function injectCloseKnitAction(item: AnyObject): void {
   if (!enabled() || !characterOf(item)) {
     // Un-applying itself, in both directions. Removing here rather than simply
     // not adding is what makes {@link reconcileCloseKnitCards} work against
-    // documents that are already prepared.
+    // documents that are already prepared. The native action, if the card had
+    // one, is not put back here — it can't be from a prepared collection — which
+    // is why that function resets the document instead of calling this alone.
     actions["delete"]?.(ACTION_ID);
     cache.delete(item);
     return;
   }
+
+  stripNativeActions(actions);
 
   const cached = cache.get(item);
   const action =
@@ -284,6 +356,13 @@ export function injectCloseKnitAction(item: AnyObject): void {
  * prepared, and nothing re-prepares an already-open sheet on its own. Unlinked
  * token actors are separate documents from anything in `game.actors`, hence the
  * second pass; linked ones are the same object, which is what `seen` skips.
+ *
+ * `reset()` rather than calling `injectCloseKnitAction` again, for the reason
+ * `blighting-strike.ts` gives: turning the setting *on* strips the SRD card's
+ * native action from the prepared collection, and turning it *off* has to put
+ * that action back — which only re-initialising the document from `_source` can
+ * do. `reset` ends by calling `prepareData` itself, so the injection re-applies
+ * on the way out when the setting is being turned on.
  */
 export function reconcileCloseKnitCards(): void {
   const seen = new Set<string>();
@@ -292,7 +371,12 @@ export function reconcileCloseKnitCards(): void {
     let changed = false;
     for (const item of (actor["items"] ?? []) as Iterable<AnyObject>) {
       if (!isCloseKnitCard(item)) continue;
-      injectCloseKnitAction(item);
+      cache.delete(item);
+      try {
+        item["reset"]?.();
+      } catch (error) {
+        console.warn(`${LOG_PREFIX} ${LABEL}: could not reset the card.`, error);
+      }
       changed = true;
       item["render"]?.(false);
     }
@@ -344,7 +428,8 @@ function resource(actor: AnyObject | null | undefined): { value: number; max: nu
 }
 
 /**
- * Every other character the table could hand Hope to.
+ * Every other character the table could hand Hope to, sorted into who is
+ * actually within reach.
  *
  * Assigned characters first, because that is the party; then anything standing on
  * the current scene, which catches a guest character nobody is playing. Falling
@@ -352,8 +437,34 @@ function resource(actor: AnyObject | null | undefined): { value: number; max: nu
  * no assignments and an empty scene should still be able to use the card, but a
  * world with a party should not have to scroll past three seasons of retired
  * ones.
+ *
+ * ## The range check
+ *
+ * "…an ally within Far range." Measured the way every other range in this module
+ * is — `range-bands.ts`, which mirrors the system's own `Token#distanceTo` and
+ * the world's (or scene's) Far threshold — and it sorts every candidate one of
+ * three ways:
+ *
+ * - **`inRange`** — measured, and inside Far. The only ones offered.
+ * - **`outOfRange`** — measured, and beyond it. Named in the prompt so the player
+ *   sees the friend is there and *why* they can't be picked, rather than
+ *   wondering where they went.
+ * - **`unmeasured`** — nothing to measure: no canvas, or one of the two has no
+ *   token on this scene. **Not offered**, and named separately. This is the
+ *   strict reading `witchs-charm.ts` already takes for the same phrase, and the
+ *   reason is the same: a rule that fires on an assumed distance is spending a
+ *   resource on a range nobody checked. At this table the token is on the scene
+ *   (that is what the native action was traded away against), so in practice
+ *   this is the "sheet opened from the directory with no scene up" case, and the
+ *   refusal says so in words.
  */
-function allies(actor: AnyObject): AnyObject[] {
+interface Candidates {
+  inRange: AnyObject[];
+  outOfRange: AnyObject[];
+  unmeasured: AnyObject[];
+}
+
+function allies(actor: AnyObject): Candidates {
   const self = String(actor["uuid"] ?? "");
   const found = new Map<string, AnyObject>();
 
@@ -377,16 +488,34 @@ function allies(actor: AnyObject): AnyObject[] {
     for (const candidate of game.actors?.contents ?? []) consider(candidate);
   }
 
-  return [...found.values()].sort((a, b) =>
-    String(a["name"] ?? "").localeCompare(String(b["name"] ?? "")),
-  );
+  const byName = (a: AnyObject, b: AnyObject): number =>
+    String(a["name"] ?? "").localeCompare(String(b["name"] ?? ""));
+
+  const sorted: Candidates = { inRange: [], outOfRange: [], unmeasured: [] };
+  for (const ally of [...found.values()].sort(byName)) {
+    const within = withinBand(distanceBetweenActors(actor, ally), BAND);
+    if (within === true) sorted.inRange.push(ally);
+    else if (within === false) sorted.outOfRange.push(ally);
+    else sorted.unmeasured.push(ally);
+  }
+  return sorted;
 }
 
-/** Ask which ally receives. Rows, so their name comes with their Hope beside it. */
-async function askAlly(actor: AnyObject, choices: AnyObject[]): Promise<AnyObject | null> {
+/** "A, B and C" in the active language, or "" for nobody. */
+function names(actors: AnyObject[]): string {
+  const list = actors.map((ally) => String(ally["name"] ?? "")).filter((name) => name);
+  return list.length ? game.i18n.getListFormatter().format(list) : "";
+}
+
+/**
+ * Ask which ally receives. Rows, so their name comes with their Hope beside it.
+ * Only the in-range allies are rows; the others are a sentence under the
+ * question, so nobody is left looking for a friend who is standing right there.
+ */
+async function askAlly(actor: AnyObject, candidates: Candidates): Promise<AnyObject | null> {
   const hopeLabel = game.i18n.localize("EE.Features.CloseKnit.HopeLabel");
 
-  const options: PromptOption[] = choices.map((ally) => {
+  const options: PromptOption[] = candidates.inRange.map((ally) => {
     const held = resource(ally);
     return {
       id: String(ally["uuid"] ?? ""),
@@ -396,15 +525,25 @@ async function askAlly(actor: AnyObject, choices: AnyObject[]): Promise<AnyObjec
     };
   });
 
+  const intro = [game.i18n.format("EE.Features.CloseKnit.AllyIntro", { hope: resource(actor).value })];
+  if (candidates.outOfRange.length) {
+    intro.push(
+      game.i18n.format("EE.Features.CloseKnit.OutOfRange", { names: names(candidates.outOfRange) }),
+    );
+  }
+  if (candidates.unmeasured.length) {
+    intro.push(
+      game.i18n.format("EE.Features.CloseKnit.Unmeasured", { names: names(candidates.unmeasured) }),
+    );
+  }
+
   const answer = await chooseOne({
     title: game.i18n.localize("EE.Features.CloseKnit.Title"),
-    intro: game.i18n.format("EE.Features.CloseKnit.AllyIntro", {
-      hope: resource(actor).value,
-    }),
+    intro: intro.join(" "),
     options,
   });
 
-  return choices.find((ally) => String(ally["uuid"] ?? "") === answer) ?? null;
+  return candidates.inRange.find((ally) => String(ally["uuid"] ?? "") === answer) ?? null;
 }
 
 /**
@@ -559,7 +698,16 @@ function refusal(actor: AnyObject | null | undefined): string | null {
   if (!actor) return "EE.Features.CloseKnit.NoActor";
   if (spentMark(actor)) return "EE.Features.CloseKnit.Spent";
   if (resource(actor).value < 1) return "EE.Features.CloseKnit.NoHope";
-  if (allies(actor).length === 0) return "EE.Features.CloseKnit.NoAlly";
+  // Three different absences, said three different ways: nobody at all, nobody
+  // whose distance could be measured (the giver has no token on this scene, or
+  // there is no scene), and somebody measured but too far.
+  const candidates = allies(actor);
+  if (candidates.inRange.length === 0) {
+    if (candidates.outOfRange.length === 0 && candidates.unmeasured.length === 0)
+      return "EE.Features.CloseKnit.NoAlly";
+    if (candidates.outOfRange.length === 0) return "EE.Features.CloseKnit.NoRange";
+    return "EE.Features.CloseKnit.NoAllyInRange";
+  }
   // `emitAsGM` sends *every* non-GM resource change over the socket, including a
   // character's changes to their own sheet, so with nobody there to receive it
   // neither half of the transfer would land — while the marker and the chat line,
@@ -596,8 +744,7 @@ async function share(action: AnyObject): Promise<void> {
   inFlight.add(key);
 
   try {
-    const choices = allies(actor);
-    const ally = await askAlly(actor, choices);
+    const ally = await askAlly(actor, allies(actor));
     if (!ally) {
       console.debug(`${LOG_PREFIX} ${LABEL}: nobody chosen; nothing spent.`);
       return;

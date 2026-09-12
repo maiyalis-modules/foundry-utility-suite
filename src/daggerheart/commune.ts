@@ -1,10 +1,15 @@
 /**
- * **Commune** (Witch class feature, *Void for Daggerheart*) — "Once per long
- * rest, during a moment of calm, you can commune with an ancestor, deity, nature
- * spirit, or otherworldly being. Ask them a question, then roll a number of d6s
- * equal to your Spellcast trait. Choose one value from the rolled results and
- * reference the chart below for the effect: 1-3 a flavor, a scent or a
- * sensation; 4-5 sounds or a vision; 6 a scene experienced as if you were there."
+ * **Commune** (Witch class feature — Hope and Fear SRD, previously *Void for
+ * Daggerheart*) — "Once per long rest during a moment of calm, you can commune
+ * with an ancestor, a deity, a spirit, or an otherworldly being. Ask them a
+ * question, then roll a number of d6s equal to your Spellcast trait. Choose one
+ * of the results and reference the chart below for the effect: 1–3 a flavor, a
+ * scent or a sensation; 4–5 sounds or a vision; 6 a scene experienced as if you
+ * were there."
+ *
+ * Written against the Void's card; the SRD's (2.9.3) differs only in the
+ * preamble's wording — same d6 pool, same chart, same single `Commune` action —
+ * so everything below applies to both without a branch. See `MATCH`.
  *
  * ## What the Void ships
  *
@@ -94,9 +99,22 @@ import { askText, chooseFromRadios, showNotice } from "./feature-prompt.js";
 import { findGrantingItem, type FeatureMatch } from "./feature-registry.js";
 import { rollVisibility, showDiceEarly, withoutApplyButtons } from "./roll-pipeline.js";
 
-/** How the card is recognised: flag, then compendium source, then printed name. */
+/**
+ * How the card is recognised: flag, then compendium source, then printed name.
+ *
+ * Two sources, because the card has two homes. The Hope and Fear SRD absorbed the
+ * Witch (Daggerheart 2.9.3), and its copy is the one a character built today
+ * carries; the Void's is kept for a sheet made before that, whose card is still
+ * this rule under the same name. The chart is byte-identical between them
+ * (1–3 / 4–5 / 6, same three outcomes), so one `CHART` serves both. Listed SRD
+ * first only because that is the copy in play — the order is not a preference,
+ * `findGrantingItem` stops at the first hit either way.
+ */
 const MATCH: FeatureMatch = {
-  compendiumSources: ["Compendium.the-void-unofficial.classes.Item.PKcnVdqacraEf8uL"],
+  compendiumSources: [
+    "Compendium.daggerheart.classes.Item.koq6qy5n7alp7kcb",
+    "Compendium.the-void-unofficial.classes.Item.PKcnVdqacraEf8uL",
+  ],
   names: ["Commune"],
 };
 

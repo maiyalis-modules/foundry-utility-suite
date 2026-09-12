@@ -1,16 +1,35 @@
 /**
- * **Brave Face** (Warborne community, *Void for Daggerheart*) — "Once per
- * session, when an attack would cause you to mark a Stress, you can spend a Hope
- * instead."
+ * **Brave Face** (Warborne community — Hope and Fear SRD, previously *Void for
+ * Daggerheart*) — "Once per session when you would be forced to mark a Stress,
+ * you can spend a Hope instead."
  *
- * ## What the Void ships
+ * ## What the two cards ship
  *
- * `Compendium.the-void-unofficial.communities.Item.KrqCfjp4E1r10XQr`, a `feature`
- * Item that is description and nothing else: no action, no resource, no effect.
- * There is nothing to press, which is correct — the rule has no moment a player
- * could press it *at*. It fires inside somebody else's attack, between the damage
- * being worked out and the sheet being written, and the only honest automation is
- * one that gets in there and asks.
+ * The Void's (`Compendium.the-void-unofficial.communities.Item.KrqCfjp4E1r10XQr`)
+ * is a `feature` Item that is description and nothing else: no action, no
+ * resource, no effect. There is nothing to press, which is correct — the rule has
+ * no moment a player could press it *at*. It fires inside somebody else's attack,
+ * between the damage being worked out and the sheet being written, and the only
+ * honest automation is one that gets in there and asks.
+ *
+ * The SRD's (Daggerheart 2.9.3, `Compendium.daggerheart.communities.Item.E7QiHAoOxQIZEVR1`)
+ * adds a button anyway: an `effect` action called "Spend Hope" — cost 1 Hope,
+ * `uses: 1 / session`, `target: any`, no effects and no triggers. Pressing it
+ * takes the Hope, posts a card and ticks its own counter, and does nothing about
+ * the Stress, because nothing an action does can reach into a damage packet that
+ * is being applied to its owner. It is a receipt, not the rule. Beside the
+ * interception below it would be a second once-per-session counter and a second
+ * way to spend the same Hope on the same hit, so it is **removed at preparation
+ * time** ({@link stripNativeActions}) and the card looks as the Void's does: a
+ * counter and a description. Same seam as `close-knit.ts` and
+ * `blighting-strike.ts`, display-only and reversible — `reset()` puts the button
+ * back the moment the setting goes off. Both homes are matched; see `MATCH`.
+ *
+ * The SRD also reworded the trigger: "when an attack would cause you to mark a
+ * Stress" became "when you would be forced to mark a Stress". Nothing changes
+ * below — the wide reading this file already took (any action's damage landing
+ * on you, not just an attack roll's) is now the printed one. What it still does
+ * not reach is Stress that never passes through `applyDamage`; see the silences.
  *
  * ## Where it gets in
  *
@@ -39,7 +58,8 @@
  * counter on the card's row in the Features tab, so "once per session" is a thing
  * the player can *see* and, if the table rules otherwise, edit; and it is what
  * makes the system's own end-of-session refresh clear the use, so no part of the
- * reset is this module's to get wrong.
+ * reset is this module's to get wrong. The SRD action's own `uses` counter goes
+ * with the action, which is what leaves one counter rather than two.
  *
  * {@link reconcileBraveFaceCards} writes the resource whole, at `ready`, from the
  * one client `isWriter` picks — whole because a partial write into a nullish
@@ -54,13 +74,13 @@
  *
  * ## Reading the rule
  *
- * - **"an attack"** is read as *an action's damage landing on you*, recorded on
- *   the shared `applyDamage` wrapper (`damage-landing.ts`) the same way
- *   `hex.ts` records who hurt whom. It is deliberately not narrowed to actions
- *   that made an attack roll: an environment's damage is an attack to everyone at
- *   the table, and narrowing would fail silently — the offer simply would not
- *   appear, and nobody would know why. The cost of the wide reading is an offer
- *   the player can decline.
+ * - **"forced to mark a Stress"** is read as *an action's damage landing on
+ *   you*, recorded on the shared `applyDamage` wrapper (`damage-landing.ts`) the
+ *   same way `blighting-strike.ts` reads who is dealing it. It is deliberately
+ *   not narrowed to actions that made an attack roll: an environment's damage
+ *   forces the Stress just as an adversary's does, and narrowing would fail
+ *   silently — the offer simply would not appear, and nobody would know why.
+ *   The cost of the wide reading is an offer the player can decline.
  * - **"a Stress"** is one. An attack that marks two leaves one of them marked and
  *   swaps the other. Printed adversary attacks mark exactly one, so this is a rule
  *   for a case that mostly does not arise, and taking the whole lot for a single
@@ -73,7 +93,10 @@
  *
  * - **Nothing else can trigger it.** Stress marked by pressing your own card,
  *   typed into the sheet by the GM, or applied by a macro that never went through
- *   `applyDamage` raises no prompt. Only a landing attack does.
+ *   `applyDamage` raises no prompt. Only a landing attack does. A GM who narrates
+ *   "mark a Stress" and reaches for the sheet is forcing one every bit as much as
+ *   the SRD means, and gets no offer — there is no seam in a hand edit to ask
+ *   from, and the printed card is on the sheet to be pointed at.
  * - **Stress you chose to spend is not Stress an attack caused.** A character
  *   with a stress-for-damage rule who spends two Stress in the armor-slot dialog
  *   has them merged into the very same update entry by `takeDamage` itself, and
@@ -92,7 +115,7 @@
  *   what makes this the one reaction in the module that goes to the person being
  *   hit rather than to somebody watching.
  */
-import { LOG_PREFIX, MODULE_ID, SETTINGS } from "../constants.js";
+import { FLAGS, LOG_PREFIX, MODULE_ID, SETTINGS } from "../constants.js";
 import { escapeHtml } from "../utils/escape-html.js";
 import { isWriter } from "../utils/is-writer.js";
 import { onDamageMarking } from "./damage-marking.js";
@@ -113,11 +136,21 @@ const FEATURE_ID = "braveFace";
 /** For console lines. Deliberately the printed card name. */
 const LABEL = "Brave Face";
 
-/** The Void Item this comes from — matched ahead of the printed name. */
+/**
+ * The Items this comes from — matched ahead of the printed name. Both homes of
+ * the card are listed (see the header); SRD first only because that is the copy
+ * in play, since `findGrantingItem` stops at the first hit either way.
+ */
 const MATCH: FeatureMatch = {
-  compendiumSources: ["Compendium.the-void-unofficial.communities.Item.KrqCfjp4E1r10XQr"],
+  compendiumSources: [
+    "Compendium.daggerheart.communities.Item.E7QiHAoOxQIZEVR1",
+    "Compendium.the-void-unofficial.communities.Item.KrqCfjp4E1r10XQr",
+  ],
   names: ["Brave Face"],
 };
+
+/** `MATCH.names[0]`, lower-cased once, for {@link isBraveFaceCard}. */
+const PRINTED_NAME = "brave face";
 
 /** "…you can spend a Hope instead." */
 const COST: readonly FeatureCost[] = [{ key: "hope", value: 1 }];
@@ -144,7 +177,7 @@ const USES: Readonly<Record<string, string>> = {
 /**
  * How long an attack stays attributable, in milliseconds.
  *
- * Generous on purpose, for the reason `hex.ts` gives: `Actor#takeDamage` can sit
+ * Generous on purpose: `Actor#takeDamage` can sit
  * for thirty seconds inside the armor-slot query before this rule is reached, and
  * this prompt can sit for thirty more. A stale entry costs nothing — it is
  * consumed once and swept otherwise.
@@ -176,6 +209,146 @@ const asking = new Set<string>();
 
 function enabled(): boolean {
   return game.settings.get(MODULE_ID, SETTINGS.braveFace) === true;
+}
+
+/* ------------------------------------------------------------------ *
+ * The card, and the SRD's button
+ * ------------------------------------------------------------------ */
+
+/**
+ * Is this Item the Brave Face card?
+ *
+ * The same three routes as `findGrantingItem`, in the same order — flag, then
+ * source, then printed name — asked of an Item rather than of an actor, because
+ * {@link stripNativeActions} meets the card during its own preparation, before
+ * there is any reason to look for it from the outside.
+ */
+function isBraveFaceCard(item: AnyObject | null | undefined): boolean {
+  if (!item || item["type"] !== "feature") return false;
+
+  const flagged = item["flags"]?.[MODULE_ID]?.[FLAGS.featureId];
+  if (typeof flagged === "string" && flagged.trim() === FEATURE_ID) return true;
+
+  const source = item["_stats"]?.["compendiumSource"];
+  if (typeof source === "string" && (MATCH.compendiumSources ?? []).includes(source.trim())) {
+    return true;
+  }
+
+  const name = item["name"];
+  return typeof name === "string" && name.trim().toLowerCase() === PRINTED_NAME;
+}
+
+/**
+ * Take the card's own actions off the prepared collection.
+ *
+ * The SRD's card carries "Spend Hope" — see the header for what it does and
+ * does not do. Every action on the card goes, not that one by id: the card has
+ * no action of this module's to keep, and a homebrew that put a button on the
+ * Void's copy has put the same receipt there for the same reason. Display-only
+ * and the seam `close-knit.ts` and `blighting-strike.ts` use: the collection is
+ * derived from `_source` at preparation and nothing is written back, so
+ * `reset()` — which {@link resetBraveFaceCards} calls — restores the action the
+ * moment the setting is turned off. The Void's card has `actions: {}`, so there
+ * this is a no-op.
+ *
+ * Called after every preparation of every Item, so the first line is the hot
+ * path.
+ */
+function stripNativeActions(item: AnyObject): void {
+  if (!isBraveFaceCard(item)) return;
+  if (!enabled()) return;
+
+  const actions = item["system"]?.["actions"] as AnyObject | undefined;
+  if (typeof actions?.["delete"] !== "function") return;
+
+  const ids: string[] = [];
+  for (const action of actions as Iterable<AnyObject>) {
+    const id = String(action?.["_id"] ?? "");
+    if (id) ids.push(id);
+  }
+  for (const id of ids) actions["delete"](id);
+}
+
+/**
+ * Bring every Brave Face card in play into line with the current setting, on
+ * this client.
+ *
+ * `reset()` rather than `prepareData()`, for the reason `blighting-strike.ts`
+ * gives: turning the setting *on* strips the SRD card's action from the
+ * prepared collection, and turning it *off* has to put it back — which only
+ * re-initialising the document from `_source` can do. `reset` ends by calling
+ * `prepareData` itself, so the strip re-applies on the way out when the setting
+ * is being turned on. Unlinked token actors are separate documents from anything
+ * in `game.actors`, hence the second pass; linked ones are the same object,
+ * which is what `seen` skips.
+ *
+ * Runs on every client — it changes what a sheet shows, not what is stored —
+ * which is why it is not folded into {@link reconcileBraveFaceCards}, whose
+ * write is one client's.
+ */
+export function resetBraveFaceCards(): void {
+  const seen = new Set<string>();
+
+  const sweep = (actor: AnyObject): void => {
+    let changed = false;
+    for (const item of (actor["items"] ?? []) as Iterable<AnyObject>) {
+      if (!isBraveFaceCard(item)) continue;
+      try {
+        item["reset"]?.();
+      } catch (error) {
+        console.warn(`${LOG_PREFIX} ${LABEL}: could not reset the card.`, error);
+      }
+      changed = true;
+      item["render"]?.(false);
+    }
+    // The character sheet lists the card's actions, so it re-renders whether or
+    // not the card's own sheet happens to be open.
+    if (changed) actor["render"]?.(false);
+  };
+
+  for (const actor of game.actors?.contents ?? []) {
+    sweep(actor);
+    seen.add(String(actor["uuid"] ?? ""));
+  }
+
+  for (const token of canvas.tokens?.placeables ?? []) {
+    const actor = token.actor as AnyObject | null;
+    if (!actor || seen.has(String(actor["uuid"] ?? ""))) continue;
+    sweep(actor);
+  }
+}
+
+/**
+ * Wrap `Item#prepareEmbeddedDocuments`, the same seam `reach.ts`, `companion.ts`,
+ * `close-knit.ts`, `blighting-strike.ts` and `attack-of-opportunity.ts` use: the
+ * system overrides it to call `prepareData()` on each of an item's actions, so
+ * it runs on every preparation of every item and is the last thing to touch
+ * `system.actions` before anyone reads it.
+ *
+ * Sixth file-local copy of this helper — see the note in
+ * `attack-of-opportunity.ts` for why the extraction has been deferred.
+ */
+function patchPreparation(): void {
+  const prototype = CONFIG.Item?.documentClass?.["prototype"] as AnyObject | undefined;
+  const original = prototype?.["prepareEmbeddedDocuments"];
+  if (typeof original !== "function") {
+    console.warn(
+      `${LOG_PREFIX} ${LABEL}: no prepareEmbeddedDocuments to patch — the card keeps its button.`,
+    );
+    return;
+  }
+
+  prototype!["prepareEmbeddedDocuments"] = function (this: AnyObject, ...args: unknown[]): unknown {
+    const result = original.apply(this, args);
+    try {
+      stripNativeActions(this);
+    } catch (error) {
+      // A broken card must not take item preparation — and with it the whole
+      // sheet — down with it.
+      console.warn(`${LOG_PREFIX} ${LABEL}: could not strip the card's action.`, error);
+    }
+    return result;
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -516,6 +689,8 @@ async function offer(actor: AnyObject, resources: AnyObject[]): Promise<void> {
 
 /** Wire the feature up. Called once during `init`. */
 export function registerBraveFace(): void {
+  patchPreparation();
+
   onDamageLanding({
     id: FEATURE_ID,
     before: (config, targets, applying) => {

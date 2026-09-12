@@ -25,14 +25,17 @@ import { SessionLogConfig } from "./apps/session-log-config.js";
 import { MENUS, MODULE_ID, SETTINGS } from "./constants.js";
 import { reconcileOpportunityCards } from "./daggerheart/attack-of-opportunity.js";
 import { reconcileBlightingStrikeCards } from "./daggerheart/blighting-strike.js";
-import { reconcileBraveFaceCards } from "./daggerheart/brave-face.js";
+import { reconcileBraveFaceCards, resetBraveFaceCards } from "./daggerheart/brave-face.js";
 import { reconcileCloseKnitCards } from "./daggerheart/close-knit.js";
 import { reconcileCompanionCards } from "./daggerheart/companion.js";
+import { reconcileHexCards } from "./daggerheart/hex.js";
 import { DECK_CARD_TYPES, DEFAULT_DECK_LIMIT } from "./daggerheart/deck-limit.js";
 import { reconcileReach } from "./daggerheart/reach.js";
 import { reconcileSlayerCards } from "./daggerheart/slayer.js";
+import { reconcileTalismanCards } from "./daggerheart/tethered-talisman.js";
 import { HotbarPagesConfig } from "./hotbar/hotbar-pages-app.js";
 import { DEFAULT_CONFIG, refreshHotbarPage } from "./hotbar/hotbar-pages.js";
+import { refreshVoidDeprecatedContent } from "./integrations/void-deprecated-content.js";
 import { reconcileHybridFormPortraits } from "./integrations/void-hybrid-form.js";
 import { checkForSessionBoundary } from "./session-log/session-log-export.js";
 import { CATEGORY_SETTING_KEYS } from "./session-log/session-log-store.js";
@@ -517,12 +520,12 @@ export function registerSettings(): void {
     default: true,
   });
 
-  // World-scoped, and here it is the only coherent answer rather than house
-  // style: the bonus is added while a roll is being built, on whichever client
-  // is building it, so a per-user answer would have the same attack land at two
-  // different numbers depending on who threw it. Nothing is written into
-  // prepared data — the next roll re-reads the hex — so switching it off needs
-  // no reconciliation, and leaves any effect already placed as an inert label.
+  // World-scoped like the other card reshapes, and it has to be: the card's
+  // action loses its native effect as documents are prepared, so two clients
+  // disagreeing would have one applying the effect natively and the other
+  // through the GM relay. Reconciled on change because nothing re-prepares an
+  // open sheet on its own. A hex already placed stays — it is a real effect on
+  // the creature's sheet, and deleting it is one click.
   game.settings.register(MODULE_ID, SETTINGS.hexCondition, {
     name: "EE.Settings.Hex.Name",
     hint: "EE.Settings.Hex.Hint",
@@ -530,6 +533,7 @@ export function registerSettings(): void {
     config: false,
     type: Boolean,
     default: true,
+    onChange: () => reconcileHexCards(),
   });
 
   // World-scoped, and not merely for consistency: this changes a number a chat
@@ -549,10 +553,10 @@ export function registerSettings(): void {
   // World-scoped, and here more plainly than usual: the rule holds one client's
   // damage open while it asks a question on another client's screen, so a
   // per-user answer would make the talisman work or not depending on who pressed
-  // Apply. Nothing is written into prepared data — the next hit reads the new
-  // value — but a talisman already imbued stays on its holder until it is spent
-  // or deleted, which is the same thing switching the feature off mid-session
-  // does to every other standing effect in this module.
+  // Apply. A talisman already imbued stays on its holder until it is spent or
+  // deleted, which is the same thing switching the feature off mid-session does
+  // to every other standing effect in this module; the tokens are the card's own
+  // counter and stay too.
   game.settings.register(MODULE_ID, SETTINGS.tetheredTalisman, {
     name: "EE.Settings.TetheredTalisman.Name",
     hint: "EE.Settings.TetheredTalisman.Hint",
@@ -560,6 +564,9 @@ export function registerSettings(): void {
     config: false,
     type: Boolean,
     default: true,
+    // Same reason as Close-Knit: the card's button is replaced as documents are
+    // prepared, and nothing re-prepares an open sheet on its own.
+    onChange: () => reconcileTalismanCards(),
   });
 
   // World-scoped for the same reason as Companion, and it shares the mechanism:
@@ -586,9 +593,15 @@ export function registerSettings(): void {
     config: false,
     type: Boolean,
     default: true,
-    // The card carries a counter that has to exist before the first hit lands.
-    // Only the active GM's client writes; see `reconcileBraveFaceCards`.
-    onChange: () => reconcileBraveFaceCards(),
+    // Two jobs. The SRD card's "Spend Hope" button is stripped as documents are
+    // prepared, and nothing re-prepares an open sheet on its own — so every
+    // client resets its cards (same reason as Close-Knit). And the card carries a
+    // counter that has to exist before the first hit lands; only the active GM's
+    // client writes that one. See `reconcileBraveFaceCards`.
+    onChange: () => {
+      resetBraveFaceCards();
+      void reconcileBraveFaceCards();
+    },
   });
 
   // Same mechanism and so the same scope as Close-Knit: the button is built
@@ -725,6 +738,21 @@ export function registerSettings(): void {
     default: false,
     // No onChange: the pool is recomputed on every question, so the next one
     // picks this up.
+  });
+
+  // World-scoped: which cards the table can pick from is one shared answer, and
+  // a player choosing from a list the GM has already pruned is the point. Off by
+  // default — it changes what everyone sees, so the GM opts in.
+  game.settings.register(MODULE_ID, SETTINGS.hideVoidDeprecatedContent, {
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: false,
+    // Unlike most switches here this one *is* cached: the set of duplicated
+    // names is derived once and each Void pack's directory tree is built from
+    // it, so flipping the switch has to drop that cache and rebuild the trees
+    // rather than waiting for the next question.
+    onChange: () => refreshVoidDeprecatedContent(),
   });
 
   // One copies-per-deck setting per card type (see daggerheart/deck-limit.ts for

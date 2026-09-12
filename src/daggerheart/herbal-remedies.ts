@@ -1,9 +1,18 @@
 /**
- * **Herbal Remedies** (Hedge Witch subclass, *Void for Daggerheart*) — "When you
- * or an ally clear one or more Hit Points or Stress as the result of using a
- * consumable, increase the number cleared by one."
+ * **Herbal Remedies** (Hedge subclass of the Witch — Hope and Fear SRD,
+ * previously *Void for Daggerheart*) — "When you or an ally in the scene clears
+ * 1 or more Hit Points or Stress as the result of using a consumable, increase
+ * the number cleared by 1."
  *
- * ## What the Void ships, and why there is nothing to build on the card
+ * Written against the Void's card, which read "you or an ally" with no scene
+ * qualifier. The SRD's (Daggerheart 2.9.3) adds "in the scene" and is otherwise
+ * the same rule in the same shape — `actions: {}`, `resource: null` — so
+ * everything below applies to both; see `MATCH`. The new qualifier is **not
+ * enforced here**, deliberately: the +1 lands on the formula of whoever drinks,
+ * and the consumable's own targeting already decides who that can be — a potion
+ * handed to someone off-scene is a story problem before it is a rules one.
+ *
+ * ## What the card ships, and why there is nothing to build on it
  *
  * `type: "feature"`, `actions: {}`, `resource: null` — prose, and rightly so.
  * Unlike every other card in this directory there is no action here that *could*
@@ -114,9 +123,16 @@
 import { LOG_PREFIX, MODULE_ID, SETTINGS } from "../constants.js";
 import { findGrantingItem, type FeatureMatch } from "./feature-registry.js";
 
-/** The Void Item this comes from — matched ahead of the printed name. */
+/**
+ * The Items this comes from — matched ahead of the printed name. Both homes of
+ * the card are listed (see the header); SRD first only because that is the copy
+ * in play, since `findGrantingItem` stops at the first hit either way.
+ */
 const MATCH: FeatureMatch = {
-  compendiumSources: ["Compendium.the-void-unofficial.subclasses.Item.pYtLdnmhKmVtxsIM"],
+  compendiumSources: [
+    "Compendium.daggerheart.subclasses.Item.HE0slu6jR0Io2x84",
+    "Compendium.the-void-unofficial.subclasses.Item.pYtLdnmhKmVtxsIM",
+  ],
   names: ["Herbal Remedies"],
 };
 

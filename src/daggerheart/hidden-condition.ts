@@ -160,7 +160,7 @@ function rollType(config: AnyObject): string {
  *
  * The damage step reuses the action's config, by which point `buildEvaluate` has
  * replaced `config.roll` with the finished result — a `total` is the tell. Same
- * test `hex.ts` uses on the same hook, for the same reason.
+ * test the first Hex implementation used on the same hook, for the same reason.
  */
 function stillBuilding(config: AnyObject): boolean {
   const roll = config["roll"] as AnyObject | undefined;
