@@ -153,9 +153,17 @@ export class ConfigWindow extends HandlebarsApplicationMixin(ApplicationV2) {
   protected onAction(_action: string, _element: HTMLElement): void {}
 
   /**
-   * Persist {@link settingKeys} and {@link numberSettingKeys}. In a tabbed window
-   * inactive tabs are hidden with CSS but still in the DOM, so one Save covers
-   * all of them.
+   * Persist anything that isn't a lone checkbox or number — a window whose
+   * controls assemble one Object setting builds and writes it here (see
+   * `DefaultOverridesConfig`). Runs after {@link settingKeys} and
+   * {@link numberSettingKeys} on every Save; a no-op unless a subclass needs it.
+   */
+  protected async saveComposite(_root: HTMLElement): Promise<void> {}
+
+  /**
+   * Persist {@link settingKeys} and {@link numberSettingKeys}, then whatever
+   * {@link saveComposite} owns. In a tabbed window inactive tabs are hidden with
+   * CSS but still in the DOM, so one Save covers all of them.
    *
    * Unchanged settings are skipped, because writing one fires its `onChange` —
    * there is no reason to refresh every token on the canvas just because someone
@@ -180,6 +188,8 @@ export class ConfigWindow extends HandlebarsApplicationMixin(ApplicationV2) {
       if (value === current) continue;
       await game.settings.set(MODULE_ID, key, value);
     }
+
+    await this.saveComposite(root);
 
     ui.notifications?.info(game.i18n.localize("EE.Config.Saved"));
     await this.close();

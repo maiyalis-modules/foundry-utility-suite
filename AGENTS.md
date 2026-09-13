@@ -125,6 +125,24 @@ loads).
   single page change. Assignments key on `token.document.actorId` (the *base*
   actor) — `token.actor.id` differs for unlinked tokens. Foundry's hotbar has
   exactly **5** pages: `Hotbar#changePage` throws outside 1–5.
+- **Scene default overrides** (`src/scenes/scene-defaults.ts`,
+  `apps/default-overrides-config.ts`) — Foundry has no setting for what a new
+  scene starts as, so every one begins with 25% padding, a 100px square grid and
+  so on. One world Object setting `sceneDefaults` (`{ grid, darkness, padding,
+  tokenVision, globalLight }`, each `{ enabled, … }`) lets the GM opt in per
+  property; `preCreateScene` then `updateSource`s each *enabled* property onto
+  the new scene — but only when the creation data doesn't already carry it
+  (`foundry.utils.hasProperty`), which is what leaves Duplicate, compendium
+  import and other modules' `Scene.create` calls alone: all of those pass full
+  data, only the bare Create Scene dialog leaves fields open. Both grid fields
+  are held back if either was given. Edited in the tabbed `defaultOverridesMenu`
+  window (one "Scenes" tab so far; the tab strip is there so the next document
+  kind is a tab, not a window). That window lists nothing in `settingKeys` — it
+  assembles the whole tab into the one Object in `saveComposite`, and
+  `getSceneDefaults` fills in whatever a stored value is missing so the shape
+  can grow without a migration. Padding is stored as Foundry's fraction (0–0.5)
+  and shown as a percentage; darkness is 0–1; the grid size floor is Foundry's
+  `GRID_MIN_SIZE` (20).
 - **Void (Unofficial) shared detection** (`src/integrations/void-shared.ts`) —
   `voidActive`, `isWriter`, `isLycan`/`isOrderOfTheLycan`, and
   `isInHybridForm`, shared by both Void integrations below so they can never
@@ -3278,6 +3296,7 @@ src/
   settings.ts          game.settings registration (called from init)
   settings-groups.ts   headings between our buttons in core's settings list
   tokens/              per-feature modules, each exports a register…() called from init
+  scenes/              scene-side features (so far: default overrides for new scenes)
   apps/                ApplicationV2 windows not owned by a single feature
   daggerheart/         Daggerheart table rules we implement ourselves (cf. integrations/)
   integrations/        optional third-party module hookups (runtime-gated, never required)
@@ -3300,7 +3319,7 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
 - **Settings**: add a key to `SETTINGS` in `constants.ts`, register it in
   `settings.ts`, which is called during the `init` hook (settings can't be
   registered later). **Every setting is `config: false` bar one** — the module's
-  category in Foundry's settings list holds only buttons (General Features,
+  category in Foundry's settings list holds only buttons (General Features, Default Overrides,
   Per-Token Hotbars, Daggerheart Automation, Daggerheart Utilities, Session Log),
   each opening a window that owns its group. A new setting belongs in one of those
   windows, not in the flat list; a setting must never be both `config: true` and
@@ -3314,7 +3333,9 @@ styles/ templates/ lang/ packs/   served from the repo root as-is
   ones in `numberSettingKeys`; `ConfigWindow#onSave` reads each back off the
   input whose `name` is the key, holding numbers to the field's own `min`/`max`
   since nothing here goes through form submission (which is what would otherwise
-  enforce them).
+  enforce them). A window whose controls make up one Object setting (Default
+  Overrides) lists nothing there and assembles it in `saveComposite`, which
+  `onSave` calls after the per-key writes.
   - **A switch for an automated feature goes in the catalog, not a template.**
     The Daggerheart Automation window has a "General" tab plus one tab per kind of
     character content — Ancestries, Communities, Classes, Domains — and a rule is

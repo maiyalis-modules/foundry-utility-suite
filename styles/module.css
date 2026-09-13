@@ -117,6 +117,25 @@
   padding: 0.25rem 0 0 0.5rem;
 }
 
+/* --- Default Overrides ------------------------------------------------------ */
+
+/* Each row is an Override switch followed by the value it imposes. Core's
+ * `.form-fields` shares its width evenly between children, which would hand a
+ * checkbox and a "px" label as much room as the select beside them — so only the
+ * value controls flex, and the switch, the units and an inline checkbox label
+ * take their natural width. The disabled state is the browser's own. */
+.ee-config .ee-override .form-fields > input[type="checkbox"],
+.ee-config .ee-override .form-fields > .units,
+.ee-config .ee-override .form-fields > .ee-override-value {
+  flex: 0 0 auto;
+}
+
+.ee-config .ee-override .form-fields > .ee-override-value {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 /* --- Deck Limit: exhausted cards in the picker ------------------------------ */
 
 /* Dimmed, not hidden: the point of the house rule is that you can see the card

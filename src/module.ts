@@ -59,6 +59,7 @@ import { registerVoidHybridForm } from "./integrations/void-hybrid-form.js";
 import { registerVoidHybridFormStressEnd } from "./integrations/void-hybrid-form-stress.js";
 import { registerSessionLog } from "./session-log/session-log-events.js";
 import { registerSessionLogFlagButton } from "./session-log/session-log-flag-button.js";
+import { registerSceneDefaults } from "./scenes/scene-defaults.js";
 import { registerSettingsGroups } from "./settings-groups.js";
 import { registerSettings } from "./settings.js";
 import { registerDragAnimation } from "./tokens/drag-animation.js";
@@ -69,6 +70,7 @@ Hooks.once("init", async () => {
   console.log(`${LOG_PREFIX} Initializing.`);
   registerSettings();
   registerSettingsGroups();
+  registerSceneDefaults();
   registerInvisibleTokens();
   registerTokenBar();
   registerDragAnimation();

@@ -697,6 +697,13 @@ export const SETTINGS = {
    * a settings window; there's no viewer yet.
    */
   sessionLogEntries: "sessionLogEntries",
+  /**
+   * What a newly created scene starts as, where the GM wants something other
+   * than Foundry's default — one Object shaped like `SceneDefaults` in
+   * `scenes/scene-defaults.ts`, each property carrying its own override switch.
+   * Edited as a whole by the Default Overrides window's Scenes tab.
+   */
+  sceneDefaults: "sceneDefaults",
 } as const;
 
 /** Settings-menu keys (buttons that open a config window instead of a control). */
@@ -708,6 +715,11 @@ export const MENUS = {
    * order and this is the one a GM wants most often.
    */
   generalFeaturesMenu: "generalFeaturesMenu",
+  /**
+   * Opens the tabbed Default Overrides window — what newly created documents
+   * start as (so far: scenes). GM only.
+   */
+  defaultOverridesMenu: "defaultOverridesMenu",
   /** Opens the actor→hotbar-page assignment window. GM only. */
   hotbarPagesMenu: "hotbarPagesMenu",
   /**
@@ -962,6 +974,8 @@ export const TEMPLATES = {
   configFooter: `modules/${MODULE_ID}/templates/config-footer.hbs`,
   /** Body of the (untabbed) Session Log window. */
   sessionLog: `modules/${MODULE_ID}/templates/session-log.hbs`,
+  /** "Scenes" tab of the Default Overrides window. */
+  defaultOverridesScenes: `modules/${MODULE_ID}/templates/default-overrides-scenes.hbs`,
 } as const;
 
 /** Our cross-client channel. Requires `"socket": true` in module.json. */

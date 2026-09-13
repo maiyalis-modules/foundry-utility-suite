@@ -1,0 +1,105 @@
+{{!-- "Scenes" tab of the Default Overrides window. Each row is an Override
+     switch (`data-ee-override`) and the value it imposes (`data-ee-overridden`,
+     greyed out by refreshControls while the switch is off). Nothing here is in
+     ConfigWindow's settingKeys: the whole tab is assembled into one Object
+     setting by DefaultOverridesConfig#saveComposite, which reads each control by
+     its `name`. `tab` comes from _preparePartContext, and the data-group/data-tab
+     pair is what changeTab looks for. --}}
+<section class="tab {{tab.cssClass}}" data-group="{{tab.group}}" data-tab="{{tab.id}}">
+
+  <p class="hint">{{localize "EE.DefaultOverrides.Scenes.Intro"}}</p>
+
+  <fieldset>
+    <legend>{{localize "EE.DefaultOverrides.Scenes.GridLegend"}}</legend>
+
+    <div class="form-group ee-override">
+      <label for="ee-sd-grid-enabled">{{localize "EE.DefaultOverrides.Scenes.Grid.Name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" id="ee-sd-grid-enabled" name="grid.enabled"
+               data-ee-override="grid" data-tooltip="EE.DefaultOverrides.OverrideTooltip"
+               {{#if scenes.grid.enabled}}checked{{/if}}>
+        <select name="grid.type" data-ee-overridden="grid"
+                aria-label="{{localize "EE.DefaultOverrides.Scenes.Grid.Type"}}">
+          {{#each scenes.gridTypes}}
+          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{localize label}}</option>
+          {{/each}}
+        </select>
+        <input type="number" name="grid.size" data-ee-overridden="grid"
+               aria-label="{{localize "EE.DefaultOverrides.Scenes.Grid.Size"}}"
+               min="{{scenes.gridMinSize}}" step="1" value="{{scenes.grid.size}}">
+        <span class="units">{{localize "EE.DefaultOverrides.Scenes.Grid.Units"}}</span>
+      </div>
+      <p class="hint">{{localize "EE.DefaultOverrides.Scenes.Grid.Hint"}}</p>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>{{localize "EE.DefaultOverrides.Scenes.LightingLegend"}}</legend>
+
+    <div class="form-group ee-override">
+      <label for="ee-sd-darkness-enabled">{{localize "EE.DefaultOverrides.Scenes.Darkness.Name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" id="ee-sd-darkness-enabled" name="darkness.enabled"
+               data-ee-override="darkness" data-tooltip="EE.DefaultOverrides.OverrideTooltip"
+               {{#if scenes.darkness.enabled}}checked{{/if}}>
+        <input type="number" name="darkness.level" data-ee-overridden="darkness"
+               aria-label="{{localize "EE.DefaultOverrides.Scenes.Darkness.Name"}}"
+               min="0" max="1" step="0.05" value="{{scenes.darkness.level}}">
+      </div>
+      <p class="hint">{{localize "EE.DefaultOverrides.Scenes.Darkness.Hint"}}</p>
+    </div>
+
+    <div class="form-group ee-override">
+      <label for="ee-sd-global-light-enabled">{{localize "EE.DefaultOverrides.Scenes.GlobalLight.Name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" id="ee-sd-global-light-enabled" name="globalLight.enabled"
+               data-ee-override="globalLight" data-tooltip="EE.DefaultOverrides.OverrideTooltip"
+               {{#if scenes.globalLight.enabled}}checked{{/if}}>
+        <label class="checkbox ee-override-value">
+          <input type="checkbox" name="globalLight.value" data-ee-overridden="globalLight"
+                 {{#if scenes.globalLight.value}}checked{{/if}}>
+          {{localize "EE.DefaultOverrides.Scenes.GlobalLight.Value"}}
+        </label>
+      </div>
+      <p class="hint">{{localize "EE.DefaultOverrides.Scenes.GlobalLight.Hint"}}</p>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>{{localize "EE.DefaultOverrides.Scenes.PropertiesLegend"}}</legend>
+
+    <div class="form-group ee-override">
+      <label for="ee-sd-padding-enabled">{{localize "EE.DefaultOverrides.Scenes.Padding.Name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" id="ee-sd-padding-enabled" name="padding.enabled"
+               data-ee-override="padding" data-tooltip="EE.DefaultOverrides.OverrideTooltip"
+               {{#if scenes.padding.enabled}}checked{{/if}}>
+        <input type="number" name="padding.percent" data-ee-overridden="padding"
+               aria-label="{{localize "EE.DefaultOverrides.Scenes.Padding.Name"}}"
+               min="0" max="50" step="5" value="{{scenes.paddingPercent}}">
+        <span class="units">%</span>
+      </div>
+      <p class="hint">{{localize "EE.DefaultOverrides.Scenes.Padding.Hint"}}</p>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>{{localize "EE.DefaultOverrides.Scenes.VisibilityLegend"}}</legend>
+
+    <div class="form-group ee-override">
+      <label for="ee-sd-token-vision-enabled">{{localize "EE.DefaultOverrides.Scenes.TokenVision.Name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" id="ee-sd-token-vision-enabled" name="tokenVision.enabled"
+               data-ee-override="tokenVision" data-tooltip="EE.DefaultOverrides.OverrideTooltip"
+               {{#if scenes.tokenVision.enabled}}checked{{/if}}>
+        <label class="checkbox ee-override-value">
+          <input type="checkbox" name="tokenVision.value" data-ee-overridden="tokenVision"
+                 {{#if scenes.tokenVision.value}}checked{{/if}}>
+          {{localize "EE.DefaultOverrides.Scenes.TokenVision.Value"}}
+        </label>
+      </div>
+      <p class="hint">{{localize "EE.DefaultOverrides.Scenes.TokenVision.Hint"}}</p>
+    </div>
+  </fieldset>
+
+</section>

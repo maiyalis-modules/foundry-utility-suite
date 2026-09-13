@@ -20,6 +20,7 @@
  */
 import { DaggerheartAutomationConfig } from "./apps/daggerheart-automation-config.js";
 import { DaggerheartUtilitiesConfig } from "./apps/daggerheart-utilities-config.js";
+import { DefaultOverridesConfig } from "./apps/default-overrides-config.js";
 import { GeneralFeaturesConfig } from "./apps/general-features-config.js";
 import { SessionLogConfig } from "./apps/session-log-config.js";
 import { MENUS, MODULE_ID, SETTINGS } from "./constants.js";
@@ -37,6 +38,7 @@ import { HotbarPagesConfig } from "./hotbar/hotbar-pages-app.js";
 import { DEFAULT_CONFIG, refreshHotbarPage } from "./hotbar/hotbar-pages.js";
 import { refreshVoidDeprecatedContent } from "./integrations/void-deprecated-content.js";
 import { reconcileHybridFormPortraits } from "./integrations/void-hybrid-form.js";
+import { DEFAULT_SCENE_DEFAULTS } from "./scenes/scene-defaults.js";
 import { checkForSessionBoundary } from "./session-log/session-log-export.js";
 import { CATEGORY_SETTING_KEYS } from "./session-log/session-log-store.js";
 import { refreshTokenBar } from "./tokens/token-bar.js";
@@ -804,6 +806,20 @@ export function registerSettings(): void {
     onChange: (value: unknown) => checkForSessionBoundary(value),
   });
 
+  /* ---- Default Overrides -------------------------------------------------- */
+
+  // What a new scene starts as, per property and only where the GM has opted
+  // in — see scenes/scene-defaults.ts for the shape. World-scoped: scenes are
+  // the world's, and only a GM creates them in practice. One Object rather than
+  // a key per control because each property and its switch are one fact.
+  game.settings.register(MODULE_ID, SETTINGS.sceneDefaults, {
+    scope: "world",
+    config: false,
+    type: Object,
+    default: DEFAULT_SCENE_DEFAULTS,
+    // No onChange: the preCreateScene hook reads this live.
+  });
+
   /* ---- The buttons, in the order they should appear ----------------------- */
   //
   // `restricted: true` on all of them keeps them GM-only, which matters because
@@ -821,6 +837,15 @@ export function registerSettings(): void {
     hint: "EE.Settings.GeneralFeaturesMenu.Hint",
     icon: "fa-solid fa-sliders",
     type: GeneralFeaturesConfig,
+    restricted: true,
+  });
+
+  game.settings.registerMenu(MODULE_ID, MENUS.defaultOverridesMenu, {
+    name: "EE.Settings.DefaultOverridesMenu.Name",
+    label: "EE.Settings.DefaultOverridesMenu.Label",
+    hint: "EE.Settings.DefaultOverridesMenu.Hint",
+    icon: "fa-solid fa-file-pen",
+    type: DefaultOverridesConfig,
     restricted: true,
   });
 

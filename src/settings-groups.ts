@@ -24,7 +24,12 @@ import { LOG_PREFIX, MENUS, MODULE_ID, SETTINGS } from "./constants.js";
 const SETTING_GROUPS: readonly { label: string; keys: readonly string[] }[] = [
   {
     label: "EE.SettingsList.GeneralHeading",
-    keys: [MENUS.generalFeaturesMenu, MENUS.hotbarPagesMenu, MENUS.sessionLogMenu],
+    keys: [
+      MENUS.generalFeaturesMenu,
+      MENUS.defaultOverridesMenu,
+      MENUS.hotbarPagesMenu,
+      MENUS.sessionLogMenu,
+    ],
   },
   {
     label: "EE.SettingsList.DaggerheartHeading",
